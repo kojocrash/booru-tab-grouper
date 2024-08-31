@@ -9,7 +9,8 @@ async function groupTabs() {
   // Get all Gelbooru tabs
   let tabs = await chrome.tabs.query({
     url: "*://*.gelbooru.com/*",
-    groupId: chrome.tabGroups.TAB_GROUP_ID_NONE
+    groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+    // windowId: chrome.windows.WINDOW_ID_CURRENT
   })
 
   // Create blacklist

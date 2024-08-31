@@ -5,7 +5,7 @@ import "./popup.css";
 // Popup code
 
 function startGroupingSignal() {
-  let confirmation = true // window.confirm("Run Gelbooru Tab Grouper?")
+  let confirmation = window.confirm("Run Gelbooru Tab Grouper?")
   if (confirmation) {
     chrome.runtime.sendMessage({
       type: "GROUP_TABS",
