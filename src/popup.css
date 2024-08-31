@@ -1,0 +1,125 @@
+/* normalize css starts here */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+/* normalize css ends here */
+
+html {
+    font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif;
+    color: #fff;
+}
+
+body {
+    width: 300px;
+    height: 300px;
+    background: #006ffa;
+}
+
+.app {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+}
+
+.title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 0px;
+}
+
+.subtitle {
+    font-size: 12px;
+}
+
+#statusArea {
+    position: absolute;
+    bottom: 0px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+}
+
+#statusHeader {
+    font-size: 14px;
+    visibility: hidden;
+}
+
+#statusBar {
+    margin-top: 5px;
+    width: 150px;
+    height: 10px;
+    border: 2px solid white;
+    background-color: transparent;
+    border-radius: 5px;
+    color: white;
+    overflow: hidden;
+    visibility: hidden;
+}
+
+#statusBar::-webkit-progress-bar {
+    background-color: transparent;
+    border-radius: 5px;
+}
+
+#statusBar::-webkit-progress-value {
+    background-color: white;
+}
+
+#statusBar::-moz-progress-bar {
+    background-color: white;
+}
+
+code {
+    font-size: 12px;
+    font-family: inherit;
+    background-color: rgba(254, 237, 185, .3);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+.button {
+    border: 0;
+    display: inline-block;
+    width: 150px;
+    padding: 10px;
+    margin-right: 4px;
+    margin-left: 4px;
+    background-color: transparent;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: transform .2s ease;
+    user-select: none;
+}
+
+.button-img {
+    width: 100%;
+    height: auto;
+}
+
+.button:focus {
+    outline: none;
+}
+
+.button:hover {
+    transform: scale(1.1);
+}
+
+.divider {
+    margin: 30px auto 25px;
+    width: 50px;
+    border: .5px dashed #000;
+    opacity: .1;
+}
+
+
+/*# sourceMappingURL=popup.css.map*/
