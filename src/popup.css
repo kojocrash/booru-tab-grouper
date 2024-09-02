@@ -14,13 +14,22 @@ html {
 }
 
 body {
-    width: 300px;
-    height: 300px;
+    width: 500px;
+    min-height: 350px;
     background: #006ffa;
+    display: flex;
+    margin: 0;
+    padding: 0;
 }
 
 .app {
-    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+}
+
+.main-content {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -29,20 +38,15 @@ body {
     padding: 20px;
 }
 
-.title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 0px;
-}
-
-.subtitle {
-    font-size: 12px;
+h2 {
+    font-size: 16px;
+    margin-bottom: 10px;
 }
 
 #statusArea {
     position: absolute;
     bottom: 0px;
-    left: 50%;
+    left: 25%;
     transform: translateX(-50%);
     margin-bottom: 8px;
 }
@@ -75,14 +79,6 @@ body {
 
 #statusBar::-moz-progress-bar {
     background-color: white;
-}
-
-code {
-    font-size: 12px;
-    font-family: inherit;
-    background-color: rgba(254, 237, 185, .3);
-    padding: 2px 4px;
-    border-radius: 2px;
 }
 
 .button {
@@ -121,5 +117,99 @@ code {
     opacity: .1;
 }
 
+.settings {
+    width: 250px;
+    padding: 10px;
+    background-color: #005bb5;
+    border-left: 2px solid #00408a;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.setting-item {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.setting-item.sub-item {
+    margin-left: 20px;
+    margin-top: -5px;
+    display: none;
+}
+
+.setting-item.sub-item.visible {
+    display: flex;
+}
+
+.setting-item input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.setting-item input[type="checkbox"]:checked {
+    accent-color: #1086ff;
+}
+
+.setting-item input[type="checkbox"]:checked:hover {
+    accent-color: #1091ff;
+}
+
+.setting-item label {
+    margin: 0;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.setting-item input[type="text"] {
+    flex-grow: 1;
+    min-width: 0;
+    margin-left: 8px;
+}
+
+.setting-item.top-item label {
+    min-width: 80px;
+}
+
+#targetWindowTabsSettingItem label {
+    min-width: 80px;
+}
+
+#targetWindowTabs {
+    max-width: 120px;
+}
+
+.setting-item.top-item input,
+.setting-item select {
+    flex-grow: 1;
+    max-width: 140px;
+    margin-left: 8px;
+}
+
+.preview {
+    text-align: center;
+    font-size: 10px;
+    margin-top: -8px;
+    margin-bottom: 10px;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+#warnings {
+    padding-top: 10px;
+    border-top: 1px solid #fff;
+    color: #ffe200;
+    display: none;
+}
+
+#warnings p {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+#warningText {
+    font-size: 12px;
+    white-space: pre-wrap;
+}
 
 /*# sourceMappingURL=popup.css.map*/

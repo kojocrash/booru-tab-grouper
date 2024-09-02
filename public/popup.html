@@ -7,24 +7,81 @@
 </head>
 <body>
   <div class="app">
-    <button id="groupBtn" class="button"><img class="button-img" src="icons/logo_360.png"></button>
+    <div class="main-content">
+      <button id="groupBtn" class="button"><img class="button-img" src="icons/logo_360.png"></button>
+      <p class="title">Click the icon!</p>
+      <p class="subtitle">dont spam</p>
 
-    <p class="title">Click the icon!</p>
-    <p class="subtitle">dont spam</p>
+      <div id="statusArea">
+        <p id="statusHeader"></p>
+        <progress id="statusBar" value="32" max="100"></progress>
+      </div>
+    </div>
+    
+    <div class="settings">
+      <h2>Settings</h2>
+    
+      <div class="setting-item top-item">
+        <label for="groupNameSuffix">Group name:</label>
+        <input type="text" id="groupNameSuffix" placeholder="Enter suffix...">
+      </div>
+      <div id="previewText" class="preview">Preview: bonesaw_(rdkshinku)</div>
+    
+      <div class="setting-item top-item">
+        <label for="targetTabs">Target tabs</label>
+        <select id="targetTabs">
+          <option value="all">All</option>
+          <option value="currentWindow">Current window</option>
+          <option value="specificWindow">Specific window</option>
+          <option value="highlighted">Highlighted</option>
+        </select>
+      </div>
+      <div id="highlightGroupingBehaviorSettingItem" class="setting-item sub-item visible">
+        <input type="checkbox" id="highlightGroupingBehavior"/>
+        <label for="highlightGroupingBehavior">Group amongst selves</label>
+      </div>
+      <div id="targetWindowTabsSettingItem" class="setting-item sub-item">
+        <label for="targetWindowTabs">Window</label>
+        <select id="targetWindowTabs">
+        </select>
+      </div>
 
-    <div id="statusArea">
-      <p id="statusHeader"></p>
-      <progress id="statusBar" value="0" max="100"></progress>
+      <div class="setting-item top-item">
+        <label for="outputWindow">Output window</label>
+        <select id="outputWindow">
+          <option value="tabWindow">Tab's window</option>
+        </select>
+      </div>
+      <div id="groupWindowMovementBehaviorSettingItem" class="setting-item sub-item">
+        <input type="checkbox" id="groupWindowMovementBehavior"/>
+        <label for="groupWindowMovementBehavior">Move preexisting groups to window</label>
+      </div>
+     
+      <div class="setting-item">
+        <input type="checkbox" id="singleTabGroups" checked/>
+        <label for="singleTabGroups">Single-tab groups allowed</label>
+      </div>
+      <div class="setting-item">
+        <input type="checkbox" id="globalArtistTagBlacklist" checked/>
+        <label for="globalArtistTagBlacklist">Build artist tag blacklist using all tabs</label>
+      </div>
+      <div class="setting-item">
+        <input type="checkbox" id="groupUnknownArtists" checked/>
+        <label for="groupUnknownArtists">Group unknown artists</label>
+      </div>
+      <div class="setting-item">
+        <input type="checkbox" id="artistRequest" checked/>
+        <label for="artistRequest">"artist request" tag = unknown artist</label>
+      </div>
+
+      <div id="warnings">
+        <p>⚠️ Warnings</p>
+        <div id="warningText"></div>
+      </div>
     </div>
   </div>
 
   <script src="popup.js"></script>
-
-  <!--
-    This HTML file opens when you click on icon from the toolbar.
-
-    To begin the development, run `npm run watch`.
-    To create a production bundle, use `npm run build`.
-  -->
+  
 </body>
 </html>
