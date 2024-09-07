@@ -1,7 +1,7 @@
 {
-  "name": "gelbooru-tab-grouper",
-  "version": "0.1.0",
-  "description": "Group Gelbooru tabs by artist",
+  "name": "booru-tab-grouper",
+  "version": "2.0.0",
+  "description": "Attempts to group Booru tabs by artist/primary tag",
   "private": true,
   "scripts": {
     "watch": "node ./node_modules/webpack/bin/webpack.js --mode=development --watch --config config/webpack.config.js",

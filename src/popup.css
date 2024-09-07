@@ -16,7 +16,7 @@ html {
 body {
     width: 500px;
     min-height: 350px;
-    background: #006ffa;
+    background: #22438a; /*#006ffa*/
     display: flex;
     margin: 0;
     padding: 0;
@@ -24,6 +24,11 @@ body {
 
 .app {
     width: 100%;
+}
+
+.toolWindow {
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: row;
 }
@@ -36,19 +41,22 @@ body {
     flex-direction: column;
     text-align: center;
     padding: 20px;
+    position: relative;
 }
 
 h2 {
     font-size: 16px;
-    margin-bottom: 10px;
+}
+
+#tabCountLabel {
+    position: absolute;
+    bottom: 6px;
+    left: 10px;
 }
 
 #statusArea {
     position: absolute;
-    bottom: 0px;
-    left: 25%;
-    transform: translateX(-50%);
-    margin-bottom: 8px;
+    bottom: 35px;
 }
 
 #statusHeader {
@@ -81,7 +89,7 @@ h2 {
     background-color: white;
 }
 
-.button {
+#groupBtn {
     border: 0;
     display: inline-block;
     width: 150px;
@@ -97,16 +105,51 @@ h2 {
     user-select: none;
 }
 
+#groupBtn:disabled {
+    cursor: unset;
+}
+
+.button {
+    border: 0;
+    display: inline-block;
+    width: 60px;
+    padding: 5px;
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: transform .2s ease;
+    user-select: none;
+}
+
+.button.primary {
+    background-color: #fff;
+    color: #2e6af9;
+}
+
+.button.secondary {
+    color: #fff;
+    background-color: transparent;
+    border: 2px solid #fff !important;
+}
+
 .button-img {
     width: 100%;
     height: auto;
+    transition: filter 0.3s ease;
+}
+
+button:disabled .button-img {
+    filter: grayscale(100%);
 }
 
 .button:focus {
     outline: none;
 }
 
-.button:hover {
+#groupBtn:not(:disabled):hover,
+.button:not(:disabled):hover {
     transform: scale(1.1);
 }
 
@@ -120,8 +163,8 @@ h2 {
 .settings {
     width: 250px;
     padding: 10px;
-    background-color: #005bb5;
-    border-left: 2px solid #00408a;
+    background-color: rgba(0, 0, 0, 0.2); /* #005bb5 */
+    border-left: 2px solid rgba(0, 0, 0, 0.3); /* #00408a */
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -129,12 +172,15 @@ h2 {
 
 .setting-item {
     display: flex;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
 .setting-item.sub-item {
     margin-left: 20px;
-    margin-top: -5px;
+    margin-top: -3px;
+}
+
+.setting-item.sub-item.hidden {
     display: none;
 }
 
@@ -166,8 +212,36 @@ h2 {
     margin-left: 8px;
 }
 
+.setting-item input[type="text"]::placeholder {
+    color: #b6b6b6;
+}
+
+.setting-item input[type="text"]:disabled::placeholder {
+    color: transparent;
+}
+
 .setting-item.top-item label {
     min-width: 80px;
+}
+
+.checkbox-label-input-setting-item {
+    min-width: 80px;
+    display: flex;
+}
+
+.setting-item.top-item2 label {
+    min-width: 100px;
+}
+
+.checkbox-label-input-setting-item2 {
+    min-width: 100px;
+    display: flex;
+}
+
+#settingsHeader {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-wrap: nowrap;
 }
 
 #targetWindowTabsSettingItem label {
@@ -179,10 +253,15 @@ h2 {
 }
 
 .setting-item.top-item input,
+.setting-item.top-item2 input,
 .setting-item select {
     flex-grow: 1;
     max-width: 140px;
     margin-left: 8px;
+}
+
+.setting-item.top-item2 input {
+    max-width: 120px;
 }
 
 .preview {
@@ -210,6 +289,72 @@ h2 {
 #warningText {
     font-size: 12px;
     white-space: pre-wrap;
+}
+
+/* Booru Selection */
+#settingsHeaderArea {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #fff;
+    margin-bottom: 5px;
+}
+
+#booruSelectorArea {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    column-gap: 5px;
+    width: 140px;
+}
+
+#booruEditBtn {
+    border: 0;
+    background-color: transparent;
+    cursor: pointer;
+    transition: transform .2s ease;
+    user-select: none;
+    width: 15px;
+    height: 15px;
+}
+
+#booruAdvancedOptionBtn:hover {
+    transform: scale(1.1) rotate(30deg);
+}
+
+#booruEditBtn svg {
+    width: 100%;
+    height: 100%;
+    fill: #b6b6b6;
+}
+
+#booruSelect {
+    width: 70px;
+    flex-grow: 1;
+}
+
+/* Booru setting edit */
+#booruEditWindow {
+    display: none;
+}
+
+.confirmationArea {
+    display: flex;
+    justify-content: flex-end;
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    gap: 7px;
+}
+
+#unsafeTagList {
+    flex-grow: 1;
+    margin-left: 0px;
+}
+
+#advancedEditOptions {
+    display: none;
 }
 
 /*# sourceMappingURL=popup.css.map*/
