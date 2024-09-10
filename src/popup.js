@@ -8,6 +8,8 @@ import "./popup.css";
 const CURRENT_BOORU_CONFIG_VERSION = 1
 let isRunning = false;
 let isEditing = false;
+let isRenaming = false;
+let renamerMatchedGroupCount = 0;
 
 // Data
 // TODO: load from json?
@@ -94,8 +96,8 @@ const groupBtn = document.getElementById("groupBtn");
 groupBtn.addEventListener("click", startGroupingSignal);
 
 // Update status
-const statusHeader = document.getElementById("statusHeader")
-const statusBar = document.getElementById("statusBar")
+const statusHeader = document.getElementById("mainStatusHeader");
+const statusBar = document.getElementById("mainStatusBar");
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type == "STATUS_UPDATE") {
@@ -120,7 +122,8 @@ function updateRunningStatus(currentlyRunning) {
     isRunning = currentlyRunning;
   }
   
-  groupBtn.disabled = isRunning || isEditing;
+  groupBtn.disabled = isRunning || isEditing || isRenaming;
+  renamerStartBtn.disabled = isRunning || isRenaming || renamerMatchedGroupCount <= 0 || (!renamerInputPatternInput.value && !renamerOutputPatternInput.value);
 }
 
 chrome.runtime.sendMessage({type: "RUNNING_CHECK", payload: {}}, updateRunningStatus);
@@ -133,6 +136,10 @@ const targetWindowTabsSelect = document.getElementById("targetWindowTabs");
 const booruSelect = document.getElementById("booruSelect");
 const tabColorSelect = document.getElementById("tabColorSelect");
 const unsafeTabColorSelect = document.getElementById("unsafeTabColorSelect");
+const renamerMethodSelect = document.getElementById("renamerMethod");
+const renamerWindowSelect = document.getElementById("renamerWindow");
+const renamerFilterSelect = document.getElementById("renamerFilter");
+const renamerFilterColorSelect = document.getElementById("renamerFilterColor");
 
 // Text field
 const groupNameSuffixInput = document.getElementById("groupNameSuffix");
@@ -141,6 +148,8 @@ const booruImagePagePatternInput = document.getElementById("booruImagePagePatter
 const booruSearchPagePatternInput = document.getElementById("booruSearchPagePattern");
 const unsafeTagListInput = document.getElementById("unsafeTagList");
 const simpleRegexInput = document.getElementById("simpleRegexInput");
+const renamerInputPatternInput = document.getElementById("renamerInputPattern");
+const renamerOutputPatternInput = document.getElementById("renamerOutputPattern");
 
 // Checkboxes
 const groupSelfCheckbox = document.getElementById("highlightGroupingBehavior");
@@ -163,6 +172,12 @@ const simpleRegexUrlDecodeCheckbox = document.getElementById("simpleRegexUrlDeco
 const previewText = document.getElementById("previewText");
 const settingsHeader = document.getElementById("settingsHeader");
 const tabCountLabel = document.getElementById("tabCountLabel");
+const renamerPreviewText = document.getElementById("renamerPreview");
+const renamerGroupCountLabel = document.getElementById("renamerGroupCount");
+const renamerStatusHeader = document.getElementById("renamerStatusHeader");
+
+// Progress Bars
+const renamerStatusBar = document.getElementById("renamerStatusBar");
 
 // Warning section
 const warningText = document.getElementById("warningText");
@@ -172,6 +187,7 @@ const warningSection = document.getElementById("warnings");
 const groupSelfSettingItem = document.getElementById("highlightGroupingBehaviorSettingItem");
 const targetWindowSettingItem = document.getElementById("targetWindowTabsSettingItem");
 const moveGroupsSettingItem = document.getElementById("groupWindowMovementBehaviorSettingItem");
+const renamerFilterColorSettingItem = document.getElementById("renamerFilterColorSettingItem");
 
 // Windows
 const booruEditWindow = document.getElementById("booruEditWindow");
@@ -182,14 +198,19 @@ const booruPatternArea = document.getElementById("booruPatternArea");
 const booruOnlyOptions = document.getElementById("booruOnlyOptions");
 const simpleRegexUrlSearchCheckboxArea = document.getElementById("simpleRegexUrlSearchCheckboxArea");
 const simpleRegexUrlDecodeCheckboxArea = document.getElementById("simpleRegexUrlDecodeCheckboxArea");
+const toolDropdownContent = document.getElementById("toolDropdownContent");
+const toolDropdownArea = document.getElementById("toolDropdown");
 
 // Buttons
 const booruEditSaveBtn = document.getElementById("booruEditSaveBtn");
 const booruEditCancelBtn = document.getElementById("booruEditCancelBtn");
 const booruEditBtn = document.getElementById("booruEditBtn");
+const toolDropdownBtn = document.getElementById("toolDropdownBtn");
+const renamerStartBtn = document.getElementById("renamerStartBtn");
 
 // Misc
 const newBooruOption = document.getElementById("newBooruOption");
+const toolDropdownBtnImg = document.getElementById("toolDropdownBtnImg");
 
 // ========= UI FUNCTIONALITY ========= //
 // Show/hide relevant UI
@@ -250,51 +271,53 @@ outputWindowSelect.addEventListener("change", updateWarnings);
 targetWindowTabsSelect.addEventListener("change", updateWarnings);
 
 // Populate Window Dropdowns
-const outputWindowOptions = [];
-const targetWindowTabsOptions = [];
+const windowDropdowns = [outputWindowSelect, targetWindowTabsSelect, renamerWindowSelect];
 
 function populateWindowDropdowns() {
-  const selectedOutputWindowId = outputWindowSelect.value;
-  const selectedTargetWindowTabsId = targetWindowTabsSelect.value;
-  
   chrome.windows.getAll({
     populate: true,
     windowTypes: ["normal"]
   }, function(windows) {
-    outputWindowOptions.forEach(option => outputWindowSelect.removeChild(option));
-    outputWindowOptions.length = 0;
+    // Save current selections
+    let selections = new Map();
 
-    targetWindowTabsOptions.forEach(option => targetWindowTabsSelect.removeChild(option));
-    targetWindowTabsOptions.length = 0;
+    for (let windowDropdown of windowDropdowns) {
+      selections.set(windowDropdown, windowDropdown.value);
+    }
 
+    // Clear previous options
+    for (let windowOption of document.querySelectorAll(".windowOption")) {
+      windowOption.parentNode.removeChild(windowOption);
+    }
+
+    // Populate dropdown with windows
     windows.forEach(window => {
       if (window.type === "normal") {
         const activeTab = window.tabs.find(tab => tab.active);
         const title = activeTab ? activeTab.title : `Window ${window.id}`;
 
-        const option1 = document.createElement("option");
-        option1.value = window.id;
-        option1.textContent = title;
-        
-        outputWindowSelect.appendChild(option1);
-        outputWindowOptions.push(option1);
+        for (let windowDropdown of windowDropdowns) {
+          const windowOption = document.createElement("option");
+          windowOption.value = window.id;
+          windowOption.textContent = title;
+          windowOption.classList.add("windowOption")
 
-        if (selectedOutputWindowId == window.id) {
-          outputWindowSelect.value = selectedOutputWindowId;
-        }
-        
-        const option2 = document.createElement("option");
-        option2.value = window.id;
-        option2.textContent = title;
-        
-        targetWindowTabsSelect.appendChild(option2);
-        targetWindowTabsOptions.push(option2);
+          windowDropdown.appendChild(windowOption);
 
-        if (selectedTargetWindowTabsId == window.id) {
-          targetWindowTabsSelect.value = selectedTargetWindowTabsId;
+          let selectedOption = selections.get(windowDropdown);
+          if (selectedOption == window.id) {
+            windowDropdown.value = selectedOption;
+          }
         }
       }
     });
+
+    // Dispatch change event (if applicable)
+    for (let [windowDropdown, oldValue] of selections) {
+      if (windowDropdown.value != oldValue) {
+        windowDropdown.dispatchEvent(new Event("change"));
+      }
+    }
   });
 }
 
@@ -601,11 +624,144 @@ targetTabsSelect.addEventListener("change", requestTabCountUpdateAsync);
 targetWindowTabsSelect.addEventListener("change", requestTabCountUpdateAsync);
 // TODO: have tab count update when targetTabsSelect.value == "highlighted" and tab highlights have changed (im too lazy rn)
 
+// Tool dropdown
+toolDropdownBtn.addEventListener("click", () => {
+  toolDropdownContent.style.display = toolDropdownContent.style.display === "flex" ? "none" : "flex";
+});
+
+window.addEventListener("click", (event) => {
+  if (!toolDropdownArea.contains(event.target)) {
+    toolDropdownContent.style.display = "none";
+  }
+});
+
+let toolDropdownOptions = toolDropdownContent.querySelectorAll(".dropdownOption");
+for (let dropdownOption of toolDropdownOptions) {
+  dropdownOption.addEventListener("click", () => {
+    for (let opt of toolDropdownOptions) {
+      let isActive = opt == dropdownOption;
+      let toolWindow = document.getElementById(opt.value);
+      toolWindow.style.display = isActive ? "flex" : "none";
+      opt.disabled = isActive;
+    }
+
+    toolDropdownContent.style.display = "none";
+  });
+}
+
+// Renamer Tool
+function renamerMethodChanged() {
+  if (renamerMethodSelect.value == "replaceEnding") {
+    renamerInputPatternInput.placeholder = " | Gelbooru Group";
+    renamerOutputPatternInput.placeholder = "";
+  } else if (renamerMethodSelect.value == "regex") {
+    renamerInputPatternInput.placeholder = "(.+) | Gelbooru Group";
+    renamerOutputPatternInput.placeholder = "$1";
+  }
+
+  requestRenamerPreviewUpdate();
+}
+
+renamerMethodSelect.addEventListener("change", renamerMethodChanged);
+
+function renamerFilterChanged() {
+  renamerFilterColorSettingItem.style.display = renamerFilterSelect.value == "none" ? "none" : "flex";
+  requestRenamerPreviewUpdate(); 
+}
+
+renamerFilterSelect.addEventListener("change", renamerFilterChanged);
+renamerFilterColorSelect.addEventListener("change", renamerFilterChanged);
+
+function updateRenamingState(currentlyRenaming) {
+  if (currentlyRenaming != undefined) {
+    isRenaming = currentlyRenaming;
+  }
+
+  updateRunningStatus();
+}
+
+chrome.runtime.sendMessage({type: "RENAMING_CHECK", payload: {}}, updateRenamingState);
+
+// Start renamer
+function getRenamerConfigurations() {
+  let windowValue = isNaN(parseInt(renamerWindowSelect.value)) ? renamerWindowSelect.value : parseInt(renamerWindowSelect.value);
+
+  return {
+    method: renamerMethodSelect.value,
+    filter: renamerFilterSelect.value,
+    filterColor: renamerFilterColorSelect.value,
+    pattern: renamerInputPatternInput.value,
+    output: renamerOutputPatternInput.value,
+    window: windowValue
+  }
+}
+
+renamerStartBtn.addEventListener("click", () => {
+  updateRenamingState(true);
+
+  chrome.runtime.sendMessage({
+    type: "RENAMER_START",
+    payload: getRenamerConfigurations()
+  });
+});
+
+// Renamer preview
+function requestRenamerPreviewUpdate() {
+  chrome.runtime.sendMessage({
+    type: "REQUEST_RENAMER_PREVIEW",
+    payload: getRenamerConfigurations()
+  });
+}
+
+for (let input of [renamerInputPatternInput, renamerOutputPatternInput]) {
+  input.addEventListener("blur", requestRenamerPreviewUpdate);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      input.blur();
+    }
+  });
+}
+
+renamerWindowSelect.addEventListener("change", requestRenamerPreviewUpdate);
+
+function updateRenamerPreview(previewData) {
+  let foundMatches = previewData.numMatchedGroups > 0;
+  let previewError = previewData.numMatchedGroups == -1;
+  renamerPreviewText.innerText = foundMatches ?  `Preview: ${previewData.beforeExample} -> ${previewData.afterExample}` : "Preview: none";
+  renamerGroupCountLabel.innerText = `Matched Groups: ${previewError ? "?" : previewData.numMatchedGroups}`;
+  
+  renamerMatchedGroupCount = previewData.numMatchedGroups;
+  updateRenamingState();
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type == "RENAMER_PREVIEW") {
+    updateRenamerPreview(request.payload);
+  }
+});
+
+// Renamer status updates
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type == "RENAMER_STATUS_UPDATE") {
+    renamerStatusHeader.innerText = request.payload.header;
+    renamerStatusHeader.style.visibility = "visible";
+    renamerStatusBar.max = request.payload.total;
+    renamerStatusBar.value = request.payload.progress;
+    renamerStatusBar.style.visibility = "visible";
+  } else if (request.type == "RENAMER_STATUS_FINISHED") {
+    renamerStatusHeader.style.visibility = "visible";
+    renamerStatusBar.style.visibility = "hidden";
+    renamerStatusHeader.innerText = request.payload.text;
+    updateRenamingState(false);
+    requestRenamerPreviewUpdate();
+  }
+});
+
 // Load settings
 chrome.storage.local.get("settings", async function(result) {
   let settings = result.settings || {};
 	settings.booru = settings.booru != undefined ? settings.booru : "Gelbooru";
-	settings.groupNameSuffix = settings.groupNameSuffix != undefined ? settings.groupNameSuffix : "⭐";
+	settings.groupNameSuffix = settings.groupNameSuffix != undefined ? settings.groupNameSuffix : "🎨";
 	settings.targetTabOption = settings.targetTabOption != undefined ? settings.targetTabOption : "all";
 	settings.groupSelf = settings.groupSelf != undefined ? settings.groupSelf : false;
 	settings.groupWindowMovementBehavior = settings.groupWindowMovementBehavior != undefined ? settings.groupWindowMovementBehavior : false;

@@ -1,6 +1,9 @@
 'use strict';
 
 let isRunning = false;
+let isRenaming = false;
+
+// ============ HELPER FUNCTIONS ============ //
 
 // Convert string to tag-like format
 function processTag(tag) {
@@ -46,7 +49,18 @@ function patternSplit(str, pattern, regex, allowNoMatch = false) {
   }
 }
 
-async function queryTabs(config, group=true) {
+// Regex escapes
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+function escapeReplacement(string) {
+  return string.replace(/\$/g, '$$$$');
+}
+
+// ============= MAIN FUNCTIONS ============= //
+
+async function queryTabs(config, group = true) {
   // Inits
   const booruConfig = config.booruConfig;
 
@@ -337,11 +351,119 @@ async function groupTabs(config) {
   });
 }
 
+// =========== RENAMER FUNCTIONS ============ //
+async function renamer(config, run = true) {
+  if (run) { isRenaming = true; }
+
+  // Setup pattern matching
+  let inputPattern = undefined;
+  let outputPattern = undefined;
+  
+  function regexError(errorField) {
+    if (run) {
+      isRenaming = false;
+    } else {
+      chrome.runtime.sendMessage({
+        type: "RENAMER_STATUS_FINISHED",
+        payload: {
+          text: `Invalid '${errorField} Pattern'`
+        }
+      });
+      
+      return {numMatchedGroups: -1, beforeExample: "", afterExample: ""};
+    }
+  }
+
+  if (config.method == "replaceEnding") {
+    try { inputPattern = new RegExp(`(.+)${escapeRegExp(config.pattern)}`); } catch { return regexError("Input") };
+    outputPattern = `$1${escapeReplacement(config.output)}`;
+  } else if (config.method == "regex") {
+    try { inputPattern = new RegExp(config.pattern); } catch { return regexError("Input") };
+    outputPattern = config.output;
+  }
+  
+  // Setup group query options
+  let queryOptions = {}
+
+  if (config.window == "current") {
+    queryOptions.windowId = chrome.windows.WINDOW_ID_CURRENT;
+  } else if (config.window != "all") {
+    queryOptions.windowId = config.window;
+  }
+
+  if (config.filter == "color") {
+    queryOptions.color = config.filterColor;
+  }
+
+  // Process each tab
+  let groups = await chrome.tabGroups.query(queryOptions);
+  let summary = {numMatchedGroups: 0, beforeExample: "", afterExample: ""};
+  let promises = [];
+  let completed = 0;
+
+  if (run) {
+    chrome.runtime.sendMessage({
+      type: "RENAMER_STATUS_UPDATE",
+      payload: {
+        header: "Renaming groups...",
+        progress: 0,
+        total: groups.length
+      }
+    });
+  }
+
+  for (let group of groups) {
+    if (inputPattern.test(group.title)) {
+      let result = group.title.replace(inputPattern, outputPattern);
+
+      if (summary.numMatchedGroups == 0) {
+        summary.beforeExample = group.title;
+        summary.afterExample = result;
+      }
+
+      summary.numMatchedGroups++;
+
+      if (run) {
+        promises.push(chrome.tabGroups.update(group.id, {title: result}).finally(() => {
+          completed++;
+          chrome.runtime.sendMessage({
+            type: "RENAMER_STATUS_UPDATE",
+            payload: {
+              header: "Renaming groups...",
+              progress: completed,
+              total: groups.length
+            }
+          });
+        }));
+      }
+    }
+  }
+
+  if (run) {
+    // Wait for all groups to be renamed
+    await Promise.all(promises);
+
+    // Finish
+    chrome.runtime.sendMessage({
+      type: "RENAMER_STATUS_FINISHED",
+      payload: {
+        text: "Finished"
+      }
+    });
+
+    isRenaming = false;
+  } else {
+    return summary;
+  }
+}
+// ================= EVENTS ================= //
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log(request, sender)
   if (request.type == "GROUP_TABS") {
     groupTabs(request.payload);
-  } else if (request.type == "REQUEST_TAB_COUNT") {
+  } 
+  
+  else if (request.type == "REQUEST_TAB_COUNT") {
     queryTabs(request.payload, false).then(tabCount => {
       chrome.runtime.sendMessage({
         type: "TAB_COUNT",
@@ -350,11 +472,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       })
     });
-  } else if (request.type == "RUNNING_CHECK") {
+  }
+  
+  else if (request.type == "RUNNING_CHECK") {
     sendResponse(isRunning);
+  } 
+  
+  else if (request.type == "REQUEST_RENAMER_PREVIEW") {
+    renamer(request.payload, false).then(response => {
+      chrome.runtime.sendMessage({
+        type: "RENAMER_PREVIEW",
+        payload: response
+      });
+    })
+  }
+
+  else if (request.type == "RENAMER_START") {
+    renamer(request.payload, true);
+  }
+  
+  else if (request.type == "RENAMING_CHECK") {
+    sendResponse(isRenaming);
   }
 });
 
+// =============== NOTIFIERS ================ //
+
+// Window Dropdown Update Notifier
 function updateWindowDropdowns() {
   chrome.runtime.sendMessage({
     type: "WINDOW_CHANGE",
@@ -362,20 +506,15 @@ function updateWindowDropdowns() {
   }, () => {
     if (chrome.runtime.lastError) {
       // Popup not available, message ignored.
-      console.log("IGNORED")
     }
   });
 }
 
 chrome.windows.onCreated.addListener(updateWindowDropdowns);
 chrome.windows.onRemoved.addListener(updateWindowDropdowns);
-
-// Listen for active tab change
 chrome.tabs.onActivated.addListener(evt => {
   updateWindowDropdowns();
 });
-
-// Listen for tab updates (URL or title changes) but only for the active tab
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tab.active && (changeInfo.url || changeInfo.title)) {
     updateWindowDropdowns();
