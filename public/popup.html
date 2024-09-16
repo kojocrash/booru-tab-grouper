@@ -97,19 +97,21 @@
             <input type="checkbox" id="singleTabGroups" checked/>
             <label for="singleTabGroups">Single-tab groups allowed</label>
           </div>
-          <div id="booruOnlyOptions">
-            <div class="setting-item">
-              <input type="checkbox" id="globalArtistTagBlacklist" checked/>
-              <label for="globalArtistTagBlacklist">Build artist tag blacklist using all tabs</label>
-            </div>
-            <div class="setting-item">
-              <input type="checkbox" id="groupUnknownArtists" checked/>
-              <label for="groupUnknownArtists">Group unknown artists</label>
-            </div>
-            <div class="setting-item">
-              <input type="checkbox" id="artistRequest" checked/>
-              <label for="artistRequest">"artist request" tag = unknown artist</label>
-            </div>
+          <div class="setting-item">
+            <input type="checkbox" id="artistBlacklistCheckbox"/>
+            <label for="artistBlacklistCheckbox">Create artist blacklist</label>
+          </div>
+          <div class="setting-item sub-item hidden">
+            <input type="checkbox" id="globalArtistTagBlacklist"/>
+            <label for="globalArtistTagBlacklist">Build blacklist using all tabs</label>
+          </div>
+          <div class="setting-item">
+            <input type="checkbox" id="groupUnknownArtists" checked/>
+            <label for="groupUnknownArtists">Group unknown artists</label>
+          </div>
+          <div class="setting-item">
+            <input type="checkbox" id="artistRequest" checked/>
+            <label for="artistRequest">"artist request" tag = unknown artist</label>
           </div>
           <div id="warnings">
             <p>⚠️ Warnings</p>
@@ -123,47 +125,64 @@
               <label for="booruUrlPattern">URL Pattern</label>
               <input type="text" id="booruUrlPattern" placeholder="*://gelbooru.com/*">
             </div>
+
+            <div class="setting-item top-item2">
+              <label for="booruImagePagePattern">Page Pattern</label>
+              <input type="text" id="booruImagePagePattern" placeholder="(.+)- Image View -">
+            </div>
+            <div class="setting-item sub-item">
+              <div class="checkbox-label-input-setting-item">
+                <input type="checkbox" id="booruImageSplitCheckbox"/>
+                <label for="booruImageSplitCheckbox">Split</label>
+              </div>
+              <input type="text" id="booruImageSplitPattern" placeholder="">
+            </div>
+            <div class="setting-item sub-item sub-item2 hidden">
+              <label for="booruImageSplitMainMatchIndex">Main match</label>
+              <input type="number" id="booruImageSplitMainMatchIndex" step="1" value="1">
+            </div>
+            <div class="setting-item sub-item">
+              <input type="checkbox" id="booruImagePatternUseTitleCheckbox" checked/>
+              <label for="booruImagePatternUseTitleCheckbox">Use title</label>
+            </div>
+            <div class="setting-item sub-item sub-item2 hidden">
+              <input type="checkbox" id="booruImagePatternUrlDecodeCheckbox" checked/>
+              <label for="booruImagePatternUrlDecodeCheckbox">URL Decode</label>
+            </div>
+
             <div class="setting-item">
               <div class="checkbox-label-input-setting-item2">
-                <input type="checkbox" id="simpleRegexCheckbox"/>
-                <label for="simpleRegexCheckbox">Simple Regex</label>
-              </div>
-              <input type="text" id="simpleRegexInput" placeholder="drawn by (.+?) \|">
-            </div>
-            <div class="setting-item sub-item" id="simpleRegexUrlSearchCheckboxArea">
-              <input type="checkbox" id="simpleRegexUrlSearchCheckbox"/>
-              <label for="simpleRegexUrlSearchCheckbox">Search Url</label>
-            </div>
-            <div class="setting-item sub-item" id="simpleRegexUrlDecodeCheckboxArea">
-              <input type="checkbox" id="simpleRegexUrlDecodeCheckbox"/>
-              <label for="simpleRegexUrlDecodeCheckbox">Url Decode</label>
-            </div>
-            <div id="booruPatternArea">
-              <div class="setting-item top-item2">
-                <label for="booruImagePagePattern">Image Page Pattern</label>
-                <input type="text" id="booruImagePagePattern" placeholder="- Image View -">
-              </div>
-              <div class="setting-item sub-item">
-                <input type="checkbox" id="booruImagePatternRegexCheckbox"/>
-                <label for="booruImagePatternRegexCheckbox">Regex</label>
-              </div>
-              <div class="setting-item sub-item">
-                <input type="checkbox" id="booruImagePatternTitleCheckbox"/>
-                <label for="booruImagePatternTitleCheckbox">Search title</label>
-              </div>
-              <div class="setting-item top-item2">
-                <label for="booruSearchPagePattern">Search Page Pattern</label>
-                <input type="text" id="booruSearchPagePattern" placeholder="| Page:">
-              </div>
-              <div class="setting-item sub-item">
-                <input type="checkbox" id="booruSearchPatternRegexCheckbox"/>
-                <label for="booruSearchPatternRegexCheckbox">Regex</label>
-              </div>
-              <div class="setting-item sub-item">
-                <input type="checkbox" id="booruSearchPatternTitleCheckbox"/>
-                <label for="booruSearchPatternTitleCheckbox">Search title</label>
+                <input type="checkbox" id="booruSearchPageCheckbox"/>
+                <label for="booruSearchPageCheckbox">Search Page Pattern</label>
+                <input type="text" id="booruSearchPagePattern" placeholder="">
               </div>
             </div>
+            <div class="setting-item sub-item">
+              <input type="checkbox" id="booruSearchPatternCopyCheckbox"/>
+              <label for="booruSearchPatternCopyCheckbox">Copy</label>
+            </div>
+            <div id="booruSearchPatternOptions" class="hidden">
+              <div class="setting-item sub-item">
+                <div class="checkbox-label-input-setting-item">
+                  <input type="checkbox" id="booruSearchSplitCheckbox"/>
+                  <label for="booruSearchSplitCheckbox">Split</label>
+                </div>
+                <input type="text" id="booruSearchSplitPattern" placeholder="">
+              </div>
+              <div class="setting-item sub-item sub-item2 hidden">
+                <label for="booruSearchSplitMainMatchIndex">Main match</label>
+                <input type="number" id="booruSearchSplitMainMatchIndex" step="1" value="1">
+              </div>
+              <div class="setting-item sub-item">
+                <input type="checkbox" id="booruSearchPatternUseTitleCheckbox" checked/>
+                <label for="booruSearchPatternUseTitleCheckbox">Use title</label>
+              </div>
+              <div class="setting-item sub-item sub-item2 hidden">
+                <input type="checkbox" id="booruSearchPatternUrlDecodeCheckbox" checked/>
+                <label for="booruSearchPatternUrlDecodeCheckbox">URL Decode</label>
+              </div>
+            </div>
+
           </div>
           <div class="setting-item top-item2">
             <label for="tabColorSelect">Tab color</label>
@@ -255,6 +274,11 @@
           <option value="all">All</option>
           <option value="current">Current</option>
         </select>
+      </div>
+
+      <div class="setting-item ">
+        <input type="checkbox" id="renameAndMergeCheckbox" checked/>
+        <label for="renameAndMergeCheckbox">Merge</label>
       </div>
 
       <div id="renamerPreview" class="preview">Preview: ?</div>

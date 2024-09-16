@@ -7,7 +7,11 @@ let isRenaming = false;
 
 // Convert string to tag-like format
 function processTag(tag) {
-  return tag.trim().toLowerCase().replace(/\s+/g, '_');
+  if (tag) {
+    return tag.trim().toLowerCase().replace(/\s+/g, '_');
+  }
+
+  return tag;
 }
 
 // Convert unsafe tag list to comprehensive look-up blacklist
@@ -24,31 +28,6 @@ function convertTaglistInput(tagListInput) {
   return blacklist;
 }
 
-// Returns characters preceeding pattern
-function patternSplit(str, pattern, regex, allowNoMatch = false) {
-  if (pattern) {
-    if (regex) {
-      let re = new RegExp(`([\\s\\S]*?)(${pattern})`);
-      let match = re.exec(str);
-
-      if (match) {
-        return match[1];
-      }
-    } else {
-      let results = str.split(pattern)
-      if (results.length > 1) {
-        return results[0]
-      }
-    }
-
-    if (allowNoMatch) {
-      return str;
-    }
-  } else {
-    return str;
-  }
-}
-
 // Regex escapes
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
@@ -56,6 +35,52 @@ function escapeRegExp(string) {
 
 function escapeReplacement(string) {
   return string.replace(/\$/g, '$$$$');
+}
+
+// Get tags from tab
+function getTags(tab, useTitle, urlDecode, mainPattern, doSplit, splitPattern, mainMatchIndex) {
+  let mainTag = undefined;
+  let secondaryTags = [];
+  let src = tab.title;
+
+  if (!useTitle) {
+    src = tab.url || tab.pendingUrl || "";
+    if (urlDecode) {
+      src = decodeURIComponent(src);
+    }
+  }
+
+  let match = new RegExp(mainPattern).exec(src)
+
+  if (match && match[1]) {
+    if (doSplit) {
+      let tagMatches = [...match[1].matchAll(new RegExp(splitPattern, "g"))];
+      let mainIndex = parseInt(mainMatchIndex);
+      let mainTagMatch = tagMatches[mainIndex];
+
+      if (mainIndex < 0) {
+        mainIndex = tagMatches.length + (mainIndex+1);
+      }
+
+      let i = 0;
+      for (let tagMatch of tagMatches) {
+        let tag = processTag(tagMatch.splice(1).find(processTag));
+        i++;
+
+        if (tag) {
+          if (i == mainIndex) {
+            mainTag = tag;
+          } else {
+            secondaryTags.push(tag);
+          }
+        }
+      }
+    } else {
+      mainTag = processTag(match[1])
+    }
+  }
+
+  return [mainTag, secondaryTags];
 }
 
 // ============= MAIN FUNCTIONS ============= //
@@ -67,33 +92,33 @@ async function queryTabs(config, group = true) {
   // Gather list of relevant tabs
   let url_pattern = booruConfig.urlPattern;
   let tabQueryOptions = {
-    url: url_pattern,
-    groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+    url: url_pattern
   }
 
   if (config.targetTabOption == "highlighted") {
     tabQueryOptions.windowId = chrome.windows.WINDOW_ID_CURRENT;
     tabQueryOptions.highlighted = true;
     config.outputWindowOption = "tabWindow";
-  } else if (config.targetTabOption == "currentWindow") {
-    tabQueryOptions.windowId = chrome.windows.WINDOW_ID_CURRENT;
-  } else if (config.targetTabOption == "specificWindow") {
-    tabQueryOptions.windowId = config.targetTabWindowOption;
+  } else {
+    tabQueryOptions.groupId = chrome.tabGroups.TAB_GROUP_ID_NONE;
+    
+    if (config.targetTabOption == "currentWindow") {
+      tabQueryOptions.windowId = chrome.windows.WINDOW_ID_CURRENT;
+    } else if (config.targetTabOption == "specificWindow") {
+      tabQueryOptions.windowId = config.targetTabWindowOption;
+    }
   }
 
   let tabs = await chrome.tabs.query(tabQueryOptions);
-  let tagBlacklist = {};
-  
-  if (!booruConfig.simpleRegexEnabled) {
-    // Gather list of tabs used for artist tag blacklist
-    var blacklistTabs = undefined;
 
+  // Create tag blacklist
+  let tagBlacklist = {};
+
+  // Get list of tabs to use for main tag blacklist
+  if (config.artistBlacklist) {
+    let blacklistTabs = tabs;
     if (config.globalArtistTagBlacklist) {
-      blacklistTabs = await chrome.tabs.query({
-        url: url_pattern
-      })
-    } else {
-      blacklistTabs = tabs;
+      blacklistTabs = await chrome.tabs.query({url: url_pattern});
     }
 
     // Create blacklist
@@ -112,21 +137,20 @@ async function queryTabs(config, group = true) {
         i++;
       }
 
-      let tabString = booruConfig.imagePatternTitle ? tab.title : (tab.url || tab.pendingUrl || "");
-      let tabStringSplit = patternSplit(tabString, booruConfig.imagePagePattern, booruConfig.imagePatternRegex);
+      let [mainTag, secondaryTags] = getTags(tab, booruConfig.imagePatternUseTitle, booruConfig.imageUrlDecode, booruConfig.imagePagePattern, booruConfig.imagePatternSplit, booruConfig.imageSplitPattern, booruConfig.imageMainMatchIndex);
+      // if (!mainTag && booruConfig.searchPage && !booruConfig.searchPagePatternCopy) {
+      //   [mainTag, secondaryTags] = getTags(tab, booruConfig.searchPatternUseTitle, booruConfig.searchUrlDecode, booruConfig.searchPagePattern, booruConfig.searchPatternSplit, booruConfig.searchSplitPattern, booruConfig.searchMainMatchIndex);
+      // }
 
-      if (tabStringSplit) {
-        let tabTitleString = booruConfig.imagePatternTitle ? patternSplit(tab.title, booruConfig.imagePagePattern, booruConfig.imagePatternRegex, true) : tab.title;
-        let secondaryTags = tabTitleString.split("|")[0].split(",").splice(1);
-
+      if (mainTag) {
         for (let tag of secondaryTags) {
-          tagBlacklist[processTag(tag)] = true;
+          tagBlacklist[tag] = true;
         }
       }
     }
   }
 
-  // Process all Gelbooru tabs
+  // Process all booru tabs
   let groupingInfo = {};
   let tabCount = 0;
   let unsafeTags = convertTaglistInput(booruConfig.unsafeTagList);
@@ -145,90 +169,63 @@ async function queryTabs(config, group = true) {
   }
   
   async function processTab(tab) {
-    if (tab.groupId == chrome.tabGroups.TAB_GROUP_ID_NONE) {
-      let isRelevantTab = false;
-      let mainTag = undefined;
-      let isUnsafe = false;
-
-      if (booruConfig.simpleRegexEnabled) {
-        let src = tab.title;
-        if (booruConfig.simpleRegexUrlSearch) {
-          src = tab.url || tab.pendingUrl || "";
-          if (booruConfig.simpleRegexUrlDecode) {
-            src = decodeURIComponent(src);
-          }
-        }
-        let matches = new RegExp(booruConfig.simpleRegex).exec(src);
-        if (matches) {
-          for (let match of matches.splice(1)) {
-            let tag = match ? processTag(match) : undefined;
-            if (tag) {
-              mainTag = tag;
-              isRelevantTab = true;
-              isUnsafe = Boolean(unsafeTags[mainTag]);
-              break;
-            }
-          }
-        }
-      } else {
-        // Only work on tabs which are image pages or tag search pages
-        let tabImgString = booruConfig.imagePatternTitle ? tab.title : (tab.url || tab.pendingUrl || "");
-        let tabSearchString = booruConfig.searchPatternTitle ? tab.title : (tab.url || tab.pendingUrl || "");
-        let tabImgStringSplit = patternSplit(tabImgString, booruConfig.imagePagePattern, booruConfig.imagePatternRegex);
-        let tabSearchStringSplit = patternSplit(tabSearchString, booruConfig.searchPagePattern, booruConfig.searchPatternRegex);
-        
-        let isImgTab = tabImgStringSplit != undefined;
-        let isSearchTab = tabSearchStringSplit != undefined;
-        isRelevantTab = isImgTab || isSearchTab;
-
-        if (isRelevantTab) {
-          let tabTitleString = isImgTab ? tabImgStringSplit : tabSearchStringSplit;
-          let tags = tabTitleString.split("|")[0].split(",");
-          mainTag = processTag(tags[0]);
-
-          // TODO: remove `isSearchTag` from if statement?
-          if ((isSearchTab && tagBlacklist[mainTag]) || (tab.title.includes("artist request") && config.artistRequest)) {
-            if (config.groupUnknownArtists) {
-              mainTag = "unknown artist";
-            } else {
-              return;
-            }
-          }
+    let isImgTab = false;
+    let isSearchTab = false;
+    let mainTag = undefined;
     
-          // Search for unsafe tags
-          for (let tag of tags) {
-            if (unsafeTags[processTag(tag)]) {
-              isUnsafe = true;
-              break;
-            }
-          }
+    // Match image pattern
+    let [imgMainTag, imgSecondaryTags] = getTags(tab, booruConfig.imagePatternUseTitle, booruConfig.imageUrlDecode, booruConfig.imagePagePattern, booruConfig.imagePatternSplit, booruConfig.imageSplitPattern, booruConfig.imageMainMatchIndex);
+    isImgTab = Boolean(imgMainTag);
+    mainTag = imgMainTag;
+
+    // Match search page pattern
+    if (booruConfig.searchPage) {
+      let searchMainTag = imgMainTag;
+      let searchSecondaryTags = imgSecondaryTags;
+
+      if (!booruConfig.searchPagePatternCopy) {
+        [searchMainTag, searchSecondaryTags] = getTags(tab, booruConfig.searchPatternUseTitle, booruConfig.searchUrlDecode, booruConfig.searchPagePattern, booruConfig.searchPatternSplit, booruConfig.searchSplitPattern, booruConfig.searchMainMatchIndex);
+      }
+
+      isSearchTab = Boolean(searchMainTag);
+      mainTag = mainTag || searchMainTag; // TODO: create UI for which one takes priority; for now Image Pattern will
+    }
+    
+    // Detect unknown artist
+    // TODO: have blacklist apply to search tabs and/or image tabs based on UI config selections
+    if ((isSearchTab && tagBlacklist[mainTag]) || (config.artistRequest && imgSecondaryTags.includes("artist_request"))) {
+      if (config.groupUnknownArtists) {
+        mainTag = "unknown artist";
+      } else {
+        return;
+      }
+    }
+
+    // Check if considered "unsafe"
+    let isUnsafe = Boolean(unsafeTags[mainTag]);
+
+    if (isImgTab || isSearchTab) {
+      if (group) {
+        // TODO: handle unknown artist behavior here instead (edit: what made me write this?)
+        // Add to/create grouping info
+        let groupName = mainTag + config.groupNameSuffix;
+        groupingInfo[groupName] = groupingInfo[groupName] || {tabsToAdd: [], unsafeCount: 0};
+        groupingInfo[groupName].tabsToAdd.push(tab.id);
+  
+        if (isUnsafe) {
+          groupingInfo[groupName].unsafeCount++;
         }
       }
       
-  
-      if (isRelevantTab) { // if (mainTag) instead?
-        if (group) {
-          // TODO: handle unknown artist behavior here instead
-          // Add to/create grouping info
-          let groupName = mainTag + config.groupNameSuffix;
-          groupingInfo[groupName] = groupingInfo[groupName] || {tabsToAdd: [], unsafeCount: 0};
-          groupingInfo[groupName].tabsToAdd.push(tab.id);
-    
-          if (isUnsafe) {
-            groupingInfo[groupName].unsafeCount++;
-          }
-        } else {
-          tabCount++;
-        }
-      }
+      tabCount++;
     }
   }
 
   let promises = [];
   for (let tab of tabs) {
     promises.push(processTab(tab).finally(() => {
+      // Notify current progress
       if (group) {
-        // Notify current progress
         completed++;
         chrome.runtime.sendMessage({
           type: "STATUS_UPDATE",
@@ -274,7 +271,7 @@ async function groupTabs(config) {
   });
 
   async function processGroup(groupName, tabsToAdd, unsafeCount) {
-    let isUnsafe = unsafeCount == tabsToAdd.length; // TODO: check tabs in pre-existing group as well?
+    let isUnsafe = unsafeCount == tabsToAdd.length; // TODO: check tabs already inside pre-existing group as well?
     var foundGroups = undefined;
 
     if (config.targetTabOption == "highlighted" && config.groupSelf) {
@@ -282,8 +279,6 @@ async function groupTabs(config) {
     } else {
       foundGroups = await chrome.tabGroups.query({title: groupName});
     }
-
-    
 
     // Create group info for group, create new group if none exist
     if (foundGroups.length > 0) {
@@ -323,6 +318,7 @@ async function groupTabs(config) {
     }
   }
 
+  let tabCount = 0;
   for (const [groupName, groupInfo] of entries) {
     promises.push(processGroup(groupName, groupInfo.tabsToAdd, groupInfo.unsafeCount).finally(() => {
       completed++;
@@ -335,6 +331,14 @@ async function groupTabs(config) {
         }
       });
     }));
+
+    tabCount += groupInfo.tabsToAdd.length;
+    if (tabCount >= config.batchSize) {
+      await Promise.all(promises); // wait for current batch to finish
+      await new Promise(resolve => setTimeout(resolve, config.batchDelay)); // wait a delay amount
+      promises.length = 0; // clear batch
+      tabCount = 0; // reset batch
+    }
   }
 
   // Wait for all tabs to be processed
@@ -412,34 +416,113 @@ async function renamer(config, run = true) {
     });
   }
 
+  let renamingInfo = {};
+
   for (let group of groups) {
     if (inputPattern.test(group.title)) {
-      let result = group.title.replace(inputPattern, outputPattern);
+      let newTitle = group.title.replace(inputPattern, outputPattern);
 
       if (summary.numMatchedGroups == 0) {
         summary.beforeExample = group.title;
-        summary.afterExample = result;
+        summary.afterExample = newTitle;
       }
 
       summary.numMatchedGroups++;
 
       if (run) {
-        promises.push(chrome.tabGroups.update(group.id, {title: result}).finally(() => {
-          completed++;
-          chrome.runtime.sendMessage({
-            type: "RENAMER_STATUS_UPDATE",
-            payload: {
-              header: "Renaming groups...",
-              progress: completed,
-              total: groups.length
-            }
-          });
-        }));
+        renamingInfo[newTitle] = renamingInfo[newTitle] || [];
+        renamingInfo[newTitle].push({
+          id: group.id,
+          changed: newTitle != group.title
+        })
       }
     }
   }
 
   if (run) {
+    async function updateProgress() {
+      completed++;
+      chrome.runtime.sendMessage({
+        type: "RENAMER_STATUS_UPDATE",
+        payload: {
+          header: "Renaming groups...",
+          progress: completed,
+          total: groups.length
+        }
+      });
+    }
+
+    async function pushPromise(promise) {
+      promises.push(promise.finally(updateProgress));
+
+      if (promises.length >= config.batchSize) {
+        await Promise.all(promises); // wait for current batch to finish
+        await new Promise(resolve => setTimeout(resolve, config.batchDelay)); // wait a delay amount
+        promises.length = 0; // clear & reset batch
+      }
+    }
+
+    async function renameAndMerge(newTitle, entries) {
+      let foundGroups = await chrome.tabGroups.query({title: newTitle});
+      
+      let groupMap = {}
+      let largestGroupId = undefined;
+      let largestTabCount = -69;
+
+      for (let group of foundGroups) {
+        let tabs = await chrome.tabs.query({groupId: group.id});
+        groupMap[group.id] = {tabs: tabs, rename: false}
+
+        if (tabs.length >= largestTabCount) {
+          largestTabCount = tabs.length;
+          largestGroupId = group.id
+        }
+      }
+
+      for (let renameGroupEntry of entries) {
+        if (!groupMap[renameGroupEntry.id]) {
+          let tabs = await chrome.tabs.query({groupId: renameGroupEntry.id});
+          groupMap[renameGroupEntry.id] = {tabs: tabs, rename: false};
+          
+          if (tabs.length > largestTabCount) {
+            largestTabCount = tabs.length;
+            largestGroupId = renameGroupEntry.id;
+          }
+        }
+        groupMap[renameGroupEntry.id].rename = renameGroupEntry.changed
+      }
+
+      let localPromises = []
+      for (let [groupId, groupData] of Object.entries(groupMap)) {
+        if (groupId == largestGroupId) {
+          if (groupData.rename) {
+            localPromises.push(chrome.tabGroups.update(groupId, {title: newTitle}));
+          }
+        } else {
+          localPromises.push(chrome.tabs.group({
+            groupId: largestGroupId,
+            tabIds: groupData.tabs.map(tab => tab.id)
+          }));
+        }
+      }
+
+      await Promise.all(localPromises);
+    }
+
+    for (let [newTitle, entries] of Object.entries(renamingInfo)) {
+      if (config.merge) {
+        pushPromise(renameAndMerge(newTitle, entries));
+      } else {
+        for (let groupEntry of entries) {
+          if (groupEntry.changed) {
+            pushPromise(chrome.tabGroups.update(groupEntry.id, {title: newTitle}));
+          } else {
+            updateProgress();
+          }
+        }
+      }
+    }
+
     // Wait for all groups to be renamed
     await Promise.all(promises);
 
@@ -519,4 +602,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tab.active && (changeInfo.url || changeInfo.title)) {
     updateWindowDropdowns();
   }
+});
+
+// Tab highlighting changes
+chrome.tabs.onHighlighted.addListener((highlightInfo) => {
+  chrome.runtime.sendMessage({
+    type: "TAB_HIGHLIGHT",
+    payload: {}
+  });
 });

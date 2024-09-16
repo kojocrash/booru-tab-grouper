@@ -1,6 +1,6 @@
 {
   "name": "booru-tab-grouper",
-  "version": "2.1.0",
+  "version": "2.3.0",
   "description": "Attempts to group Booru tabs by artist/primary tag",
   "private": true,
   "scripts": {

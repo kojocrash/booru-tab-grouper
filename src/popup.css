@@ -187,12 +187,16 @@ button:disabled .button-img {
     margin-left: 20px;
 }
 
-.setting-item.sub-item.hidden {
+.hidden {
     display: none;
 }
 
 .setting-item.sub-item.visible {
     display: flex;
+}
+
+.setting-item.sub-item2 {
+    margin-left: 40px;
 }
 
 .setting-item input[type="checkbox"] {
@@ -213,22 +217,29 @@ button:disabled .button-img {
     text-align: left;
 }
 
+.setting-item input[type="number"],
 .setting-item input[type="text"] {
     flex-grow: 1;
     min-width: 0;
     margin-left: 8px;
 }
 
+.setting-item input[type="number"]::placeholder,
 .setting-item input[type="text"]::placeholder {
     color: #b6b6b6;
 }
 
+.setting-item input[type="number"]:disabled::placeholder,
 .setting-item input[type="text"]:disabled::placeholder {
     color: transparent;
 }
 
 .setting-item.top-item label {
     min-width: 80px;
+}
+
+.setting-item.sub-item2 label {
+    min-width: 100px;
 }
 
 .checkbox-label-input-setting-item {
@@ -344,6 +355,7 @@ button:disabled .button-img {
 /* Booru setting edit */
 #booruEditWindow {
     display: none;
+    padding-bottom: 32px;
 }
 
 .confirmationArea {
@@ -442,7 +454,5 @@ button:disabled .button-img {
     margin-top: 15px;
     height: 30px;
 }
-/* Renamer Tool */
-
 
 /*# sourceMappingURL=popup.css.map*/

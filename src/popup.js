@@ -5,10 +5,11 @@ import "./popup.css";
 // Popup code
 
 // Constants & Global Variables
-const CURRENT_BOORU_CONFIG_VERSION = 1
+const CURRENT_BOORU_CONFIG_VERSION = 2
 let isRunning = false;
 let isEditing = false;
 let isRenaming = false;
+let isDataLoaded = false;
 let renamerMatchedGroupCount = 0;
 
 // Data
@@ -16,16 +17,20 @@ let renamerMatchedGroupCount = 0;
 let defaultBooruConfigs = {
   "Gelbooru": {
     urlPattern: "*://gelbooru.com/*",
-    simpleRegex: "",
-    simpleRegexEnabled: false,
-    simpleRegexUrlSearch: false,
-    simpleRegexUrlDecode: false,
-    imagePagePattern: "- Image View -",
-    imagePatternRegex: false,
-    imagePatternTitle: true,
-    searchPagePattern: "| Page:",
-    searchPatternRegex: false,
-    searchPatternTitle: true,
+    imagePagePattern: "(.+) \\- Image View \\-",
+    imagePatternSplit: true,
+    imageSplitPattern: "([^\\s,][^,]*)",
+    imageMainMatchIndex: "1",
+    imagePatternUseTitle: true,
+    imageUrlDecode: true,
+    searchPage: true,
+    searchPagePatternCopy: false,
+    searchPagePattern: "(.+) \\|.+Page: \\d",
+    searchPatternSplit: true,
+    searchSplitPattern: "(?:^\\b|[,\\s]+)([^\\s-,][^,]*)",
+    searchMainMatchIndex: "1",
+    searchPatternUseTitle: true,
+    searchUrlDecode: true,
     tabColor: "blue",
     unsafeTabColor: "red",
     unsafeTagList: "",
@@ -33,16 +38,20 @@ let defaultBooruConfigs = {
   },
   "Danbooru": {
     urlPattern: "*://danbooru.donmai.us/*",
-    simpleRegex: "drawn by (.+) \\||(.+) (?<!drawn by.+| and .+)\\||(.+) and (?!.+drawn by)",
-    simpleRegexEnabled: true,
-    simpleRegexUrlSearch: false,
-    simpleRegexUrlDecode: false,
-    imagePagePattern: "",
-    imagePatternRegex: false,
-    imagePatternTitle: false,
-    searchPagePattern: "",
-    searchPatternRegex: false,
-    searchPatternTitle: false,
+    imagePagePattern: "drawn by (.+) \\|",
+    imagePatternSplit: true,
+    imageSplitPattern: "(?:^\\b|and |drawn by )(.+?)(?= and |\\b$| drawn by )",
+    imageMainMatchIndex: "-1",
+    imagePatternUseTitle: true,
+    imageUrlDecode: true,
+    searchPage: true,
+    searchPagePatternCopy: false,
+    searchPagePattern: "posts.*[\\?&]tags=([^&]+)",
+    searchPatternSplit: true,
+    searchSplitPattern: "(?:^\\b|\\+)([^\\-][^\\+]*)",
+    searchMainMatchIndex: "1",
+    searchPatternUseTitle: false,
+    searchUrlDecode: true,
     tabColor: "orange",
     unsafeTabColor: "red",
     unsafeTagList: "",
@@ -63,9 +72,12 @@ function getCurrentConfigurations() {
     groupSelf: groupSelfCheckbox.checked,
     groupWindowMovementBehavior: groupWindowMovementBehaviorCheckbox.checked,
     singleTabGrouping: singleTabGroupsCheckbox.checked,
+    artistBlacklist: artistBlacklistCheckbox.checked,
     globalArtistTagBlacklist: globalArtistTagBlacklistCheckbox.checked,
     groupUnknownArtists: groupUnknownArtistsCheckbox.checked,
     artistRequest: artistRequestCheckbox.checked,
+    batchSize: 50, // TODO: create setting UI
+    batchDelay: 100
   }
 }
 
@@ -145,28 +157,36 @@ const renamerFilterColorSelect = document.getElementById("renamerFilterColor");
 const groupNameSuffixInput = document.getElementById("groupNameSuffix");
 const booruUrlPatternInput = document.getElementById("booruUrlPattern");
 const booruImagePagePatternInput = document.getElementById("booruImagePagePattern");
+const booruImageSplitPatternInput = document.getElementById("booruImageSplitPattern");
 const booruSearchPagePatternInput = document.getElementById("booruSearchPagePattern");
+const booruSearchSplitPatternInput = document.getElementById("booruSearchSplitPattern");
 const unsafeTagListInput = document.getElementById("unsafeTagList");
-const simpleRegexInput = document.getElementById("simpleRegexInput");
 const renamerInputPatternInput = document.getElementById("renamerInputPattern");
 const renamerOutputPatternInput = document.getElementById("renamerOutputPattern");
+
+// Number inputs
+const booruImageSplitMainMatchIndexInput = document.getElementById("booruImageSplitMainMatchIndex");
+const booruSearchSplitMainMatchIndexInput = document.getElementById("booruSearchSplitMainMatchIndex");
 
 // Checkboxes
 const groupSelfCheckbox = document.getElementById("highlightGroupingBehavior");
 const moveGroupsCheckbox = document.getElementById("moveGroupsToWindow");
 const groupWindowMovementBehaviorCheckbox = document.getElementById("groupWindowMovementBehavior");
 const singleTabGroupsCheckbox = document.getElementById("singleTabGroups");
+const artistBlacklistCheckbox = document.getElementById("artistBlacklistCheckbox");
 const globalArtistTagBlacklistCheckbox = document.getElementById("globalArtistTagBlacklist");
 const groupUnknownArtistsCheckbox = document.getElementById("groupUnknownArtists");
 const artistRequestCheckbox = document.getElementById("artistRequest");
 const advancedCheckbox = document.getElementById("advancedCheckbox");
-const booruImagePatternRegexCheckbox = document.getElementById("booruImagePatternRegexCheckbox");
-const booruImagePatternTitleCheckbox = document.getElementById("booruImagePatternTitleCheckbox");
-const booruSearchPatternRegexCheckbox = document.getElementById("booruSearchPatternRegexCheckbox");
-const booruSearchPatternTitleCheckbox = document.getElementById("booruSearchPatternTitleCheckbox");
-const simpleRegexCheckbox = document.getElementById("simpleRegexCheckbox");
-const simpleRegexUrlSearchCheckbox = document.getElementById("simpleRegexUrlSearchCheckbox");
-const simpleRegexUrlDecodeCheckbox = document.getElementById("simpleRegexUrlDecodeCheckbox");
+const booruImageSplitCheckbox = document.getElementById("booruImageSplitCheckbox");
+const booruImagePatternUseTitleCheckbox = document.getElementById("booruImagePatternUseTitleCheckbox");
+const booruImagePatternUrlDecodeCheckbox = document.getElementById("booruImagePatternUrlDecodeCheckbox");
+const booruSearchPageCheckbox = document.getElementById("booruSearchPageCheckbox");
+const booruSearchPatternCopyCheckbox = document.getElementById("booruSearchPatternCopyCheckbox");
+const booruSearchSplitCheckbox = document.getElementById("booruSearchSplitCheckbox");
+const booruSearchPatternUseTitleCheckbox = document.getElementById("booruSearchPatternUseTitleCheckbox");
+const booruSearchPatternUrlDecodeCheckbox = document.getElementById("booruSearchPatternUrlDecodeCheckbox");
+const renameAndMergeCheckbox = document.getElementById("renameAndMergeCheckbox");
 
 // Labels
 const previewText = document.getElementById("previewText");
@@ -190,14 +210,11 @@ const moveGroupsSettingItem = document.getElementById("groupWindowMovementBehavi
 const renamerFilterColorSettingItem = document.getElementById("renamerFilterColorSettingItem");
 
 // Windows
-const booruEditWindow = document.getElementById("booruEditWindow");
 const mainSettingsWindow = document.getElementById("mainSettingsWindow");
+const booruEditWindow = document.getElementById("booruEditWindow");
+const booruSearchPatternOptions = document.getElementById("booruSearchPatternOptions");
 const booruSelectorArea = document.getElementById("booruSelectorArea");
 const advancedEditOptions = document.getElementById("advancedEditOptions");
-const booruPatternArea = document.getElementById("booruPatternArea");
-const booruOnlyOptions = document.getElementById("booruOnlyOptions");
-const simpleRegexUrlSearchCheckboxArea = document.getElementById("simpleRegexUrlSearchCheckboxArea");
-const simpleRegexUrlDecodeCheckboxArea = document.getElementById("simpleRegexUrlDecodeCheckboxArea");
 const toolDropdownContent = document.getElementById("toolDropdownContent");
 const toolDropdownArea = document.getElementById("toolDropdown");
 
@@ -223,21 +240,14 @@ function updateSubSettingVisibility() {
       outputWindowSelect.style.display = "unset";
     }
 
-    if (targetTabsSelect.value == "specificWindow") {
-      targetWindowSettingItem.style.display = "flex";
-    } else {
-      targetWindowSettingItem.style.display = "none";
-    }
-
-    if (outputWindowSelect.value != "tabWindow") {
-        moveGroupsSettingItem.style.display = "flex";
-    } else {
-        moveGroupsSettingItem.style.display = "none";
-    }
+    targetWindowSettingItem.style.display = targetTabsSelect.value == "specificWindow" ? "flex" : "none";
+    moveGroupsSettingItem.style.display = outputWindowSelect.value != "tabWindow" ? "flex" : "none";
+    globalArtistTagBlacklistCheckbox.parentNode.style.display = artistBlacklistCheckbox.checked ? "flex" : "none";
 }
 
 targetTabsSelect.addEventListener("change", updateSubSettingVisibility);
 outputWindowSelect.addEventListener("change", updateSubSettingVisibility);
+artistBlacklistCheckbox.addEventListener("change", updateSubSettingVisibility);
 updateSubSettingVisibility();
 
 // Update group name preview
@@ -377,8 +387,6 @@ booruSelect.addEventListener("change", async function() {
       isSimpleRegexMode = booruData.simpleRegexEnabled;
     }
     
-    updateBooruSpecificMainSettingsVisibility(isSimpleRegexMode);
-    
     // Update tab count
     requestTabCountUpdate(booruData);
   }
@@ -417,6 +425,23 @@ async function populateBooruOptions(preloadedBooruConfigs = undefined) {
   return booruConfigs;
 }
 
+// Only allow non-zero integers for numberInputs
+for (let integerInput of [booruImageSplitMainMatchIndexInput, booruSearchSplitMainMatchIndexInput]) {
+  let lastValidInput = 1;
+  integerInput.addEventListener("input", function() {
+    if (integerInput.value) {
+      let value = parseFloat(integerInput.value);
+      if (isNaN(value) || value == 0) {
+        integerInput.value = lastValidInput > 0 ? -1 : 1;
+      } else {
+        integerInput.value = Math.floor(value);
+      }
+      lastValidInput = parseInt(integerInput.value);
+    }
+  });
+}
+
+
 // Show booru edit menu
 async function getBooruData(booruName) {
   let result = await chrome.storage.local.get("booruConfigs");
@@ -440,51 +465,70 @@ async function showBooruEditMenu(booruName, advancedView = false) {
   
   if (booruData) {
     booruUrlPatternInput.value = booruData.urlPattern;
-    simpleRegexCheckbox.checked = booruData.simpleRegexEnabled;
-    simpleRegexInput.value = booruData.simpleRegex;
-    simpleRegexUrlSearchCheckbox.checked = booruData.simpleRegexUrlSearch;
-    simpleRegexUrlDecodeCheckbox.checked = booruData.simpleRegexUrlDecode;
+
     booruImagePagePatternInput.value = booruData.imagePagePattern;
-    booruImagePatternRegexCheckbox.checked = booruData.imagePatternRegex;
-    booruImagePatternTitleCheckbox.checked = booruData.imagePatternTitle;
+    booruImageSplitCheckbox.checked = booruData.imagePatternSplit;
+    booruImageSplitPatternInput.value = booruData.imageSplitPattern;
+    booruImageSplitMainMatchIndexInput.value = booruData.imageMainMatchIndex;
+    booruImagePatternUseTitleCheckbox.checked = booruData.imagePatternUseTitle;
+    booruImagePatternUrlDecodeCheckbox.checked = booruData.imageUrlDecode;
+  
+    booruSearchPageCheckbox.checked = booruData.searchPage;
+    booruSearchPatternCopyCheckbox.checked = booruData.searchPagePatternCopy;
+
     booruSearchPagePatternInput.value = booruData.searchPagePattern;
-    booruSearchPatternRegexCheckbox.checked = booruData.searchPatternRegex;
-    booruSearchPatternTitleCheckbox.checked = booruData.searchPatternTitle;
+    booruSearchSplitCheckbox.checked = booruData.searchPatternSplit;
+    booruSearchSplitPatternInput.value = booruData.searchSplitPattern;
+    booruSearchSplitMainMatchIndexInput.value = booruData.searchMainMatchIndex;
+    booruSearchPatternUseTitleCheckbox.checked = booruData.searchPatternUseTitle;
+    booruSearchPatternUrlDecodeCheckbox.checked = booruData.searchUrlDecode;
+    
     tabColorSelect.value = booruData.tabColor;
     unsafeTabColorSelect.value = booruData.unsafeTabColor;
     unsafeTagListInput.value = booruData.unsafeTagList;
   } else {
     booruUrlPatternInput.value = "";
-    simpleRegexCheckbox.checked = false;
-    simpleRegexInput.value = "";
-    simpleRegexUrlSearchCheckbox.checked = false;
-    simpleRegexUrlDecodeCheckbox.checked = false;
-    booruImagePagePatternInput.value = "|";
-    booruImagePatternRegexCheckbox.checked = false;
-    booruImagePatternTitleCheckbox.checked = true;
+
+    booruImagePagePatternInput.value = "";
+    booruImageSplitCheckbox.checked = false;
+    booruImageSplitPatternInput.value = "";
+    booruImageSplitMainMatchIndexInput.value = "1";
+    booruImagePatternUseTitleCheckbox.checked = true;
+    booruImagePatternUrlDecodeCheckbox.checked = true;
+  
+    booruSearchPageCheckbox.checked = false;
+    booruSearchPatternCopyCheckbox.checked = false;
+
     booruSearchPagePatternInput.value = "";
-    booruSearchPatternRegexCheckbox.checked = false;
-    booruSearchPatternTitleCheckbox.checked = true;
+    booruSearchSplitCheckbox.checked = false;
+    booruSearchSplitPatternInput.value = "";
+    booruSearchSplitMainMatchIndexInput.value = "1";
+    booruSearchPatternUseTitleCheckbox.checked = true;
+    booruSearchPatternUrlDecodeCheckbox.checked = true;
+    
     tabColorSelect.value = "blue";
     unsafeTabColorSelect.value = "red";
-    unsafeTagListInput.value = ""
+    unsafeTagListInput.value = "";
   }
 
+  // Update state
+  booruImageSplitMainMatchIndexInput.dispatchEvent(new Event("input"));
+  booruSearchSplitMainMatchIndexInput.dispatchEvent(new Event("input"));
+
   // Disallow/allow editing certain options
-  updateBooruOptionDisability();
+  updateBooruOptionVisibility();
   booruEditSaveBtn.disabled = false;
   groupBtn.disabled = true;
 
-  // Change visibility
+  // Change window visibility
   mainSettingsWindow.style.display = "none";
   booruEditWindow.style.display = "unset";
   booruSelectorArea.style.display = "none";
-
-  if (advancedView) {
-    advancedCheckbox.checked = true;
-    updateAdvancedOptionVisibility();
-  }
+ 
+  advancedCheckbox.checked = advancedView;
+  updateAdvancedOptionVisibility();
 }
+
 booruEditBtn.addEventListener("click", () => showBooruEditMenu(booruSelect.value));
 
 // Close booru edit menu
@@ -508,21 +552,37 @@ async function saveBooruEdits() {
 
   // Collect new data
   let booruData = {}
+
   booruData.urlPattern = booruUrlPatternInput.value;
-  booruData.simpleRegexEnabled = simpleRegexCheckbox.checked;
-  booruData.simpleRegex = simpleRegexInput.value;
-  booruData.simpleRegexUrlSearch = simpleRegexUrlSearchCheckbox.checked;
-  booruData.simpleRegexUrlDecode = simpleRegexUrlDecodeCheckbox.checked;
+
   booruData.imagePagePattern = booruImagePagePatternInput.value;
-  booruData.imagePatternRegex = booruImagePatternRegexCheckbox.checked;
-  booruData.imagePatternTitle = booruImagePatternTitleCheckbox.checked;
+  booruData.imagePatternSplit = booruImageSplitCheckbox.checked;
+  booruData.imageSplitPattern = booruImageSplitPatternInput.value;
+  booruData.imageMainMatchIndex = booruImageSplitMainMatchIndexInput.value;
+  booruData.imagePatternUseTitle = booruImagePatternUseTitleCheckbox.checked;
+  booruData.imageUrlDecode = booruImagePatternUrlDecodeCheckbox.checked;
+
   booruData.searchPagePattern = booruSearchPagePatternInput.value;
-  booruData.searchPatternRegex = booruSearchPatternRegexCheckbox.checked;
-  booruData.searchPatternTitle = booruSearchPatternTitleCheckbox.checked;
+  booruData.searchPatternSplit = booruSearchSplitCheckbox.checked;
+  booruData.searchSplitPattern = booruSearchSplitPatternInput.value;
+  booruData.searchMainMatchIndex = booruSearchSplitMainMatchIndexInput.value;
+  booruData.searchPatternUseTitle = booruSearchPatternUseTitleCheckbox.checked;
+  booruData.searchUrlDecode = booruSearchPatternUrlDecodeCheckbox.checked;
+  
   booruData.tabColor = tabColorSelect.value;
   booruData.unsafeTabColor = unsafeTabColorSelect.value;
   booruData.unsafeTagList = unsafeTagListInput.value;
+
   booruData._version = CURRENT_BOORU_CONFIG_VERSION;
+
+  // Validation
+  if (isNaN(parseInt(booruData.searchMainMatchIndex))) {
+    booruData.searchMainMatchIndex = "1";
+  }
+  
+  if (isNaN(parseInt(booruData.imageMainMatchIndex))) {
+    booruData.imageMainMatchIndex = "1";
+  }
 
   // Update save data
   let result = await chrome.storage.local.get("booruConfigs");
@@ -535,7 +595,6 @@ async function saveBooruEdits() {
   // Change current booru
   await populateBooruOptions(booruConfigs);
   booruSelect.value = booruEditing;
-  updateBooruSpecificMainSettingsVisibility(booruData.simpleRegexEnabled);
 
   // Save most recent booru selection
   previousBooru = booruEditing;
@@ -559,55 +618,58 @@ function updateAdvancedOptionVisibility() {
 advancedCheckbox.addEventListener("change", updateAdvancedOptionVisibility);
 
 // Set disability of certain booru edit options
-function updateBooruOptionDisability() {
+function updateBooruOptionVisibility() {
   let isEditable = defaultBooruConfigs[booruEditing] == undefined;
-  let isSimpleRegexMode = simpleRegexCheckbox.checked;
 
-  booruUrlPatternInput.disabled = !isEditable;
-  simpleRegexCheckbox.disabled = !isEditable;
-  simpleRegexUrlSearchCheckbox.disabled = !isEditable;
-  simpleRegexUrlDecodeCheckbox.disabled = !isEditable;
-  simpleRegexInput.disabled = !isEditable || !isSimpleRegexMode;
-  booruImagePagePatternInput.disabled = !isEditable;
-  booruImagePatternRegexCheckbox.disabled = !isEditable;
-  booruImagePatternTitleCheckbox.disabled = !isEditable;
-  booruSearchPagePatternInput.disabled = !isEditable;
-  booruSearchPatternRegexCheckbox.disabled = !isEditable;
-  booruSearchPatternTitleCheckbox.disabled = !isEditable;
-
-  booruPatternArea.style.display = isSimpleRegexMode ? "none" : "unset";
-  simpleRegexUrlSearchCheckboxArea.style.display = isSimpleRegexMode ? "flex" : "none";
-  simpleRegexUrlDecodeCheckboxArea.style.display = isSimpleRegexMode && simpleRegexUrlSearchCheckbox.checked ? "flex" : "none";
-  updateBooruSpecificMainSettingsVisibility(isSimpleRegexMode);
-}
-simpleRegexCheckbox.addEventListener("change", updateBooruOptionDisability);
-simpleRegexUrlSearchCheckbox.addEventListener("change", updateBooruOptionDisability);
-
-function updateBooruSpecificMainSettingsVisibility(isSimpleRegexMode) {
-  if (isSimpleRegexMode) {
-    booruOnlyOptions.style.visibility = "hidden";
+  // Change disabilities
+  if (!isEditable) {
+    for (let input of advancedEditOptions.querySelectorAll("input")) {
+      input.disabled = true;
+    }
   } else {
-    booruOnlyOptions.style.visibility = "visible";
+    booruImageSplitPatternInput.disabled = !booruImageSplitCheckbox.checked;
+    booruSearchSplitPatternInput.disabled = !booruSearchSplitCheckbox.checked;
+    booruSearchPagePatternInput.disabled = !booruSearchPageCheckbox.checked;
   }
+
+  // Change visibilities
+  booruImagePatternUrlDecodeCheckbox.parentNode.style.display = !booruImagePatternUseTitleCheckbox.checked ? "flex" : "none";
+  booruImageSplitMainMatchIndexInput.parentNode.style.display = booruImageSplitCheckbox.checked ? "flex" : "none";
+  booruSearchPatternUrlDecodeCheckbox.parentNode.style.display = !booruSearchPatternUseTitleCheckbox.checked ? "flex" : "none";
+  booruSearchSplitMainMatchIndexInput.parentNode.style.display = booruSearchSplitCheckbox.checked ? "flex" : "none";
+  booruSearchPatternCopyCheckbox.parentNode.style.display = booruSearchPageCheckbox.checked ? "flex" : "none";
+  booruSearchPagePatternInput.style.display = !booruSearchPatternCopyCheckbox.checked || !booruSearchPageCheckbox.checked ? "unset" : "none";
+  booruSearchPatternOptions.style.display = booruSearchPageCheckbox.checked && !booruSearchPatternCopyCheckbox.checked ? "inherit" : "none";
 }
+
+booruImageSplitCheckbox.addEventListener("change", updateBooruOptionVisibility);
+booruImagePatternUseTitleCheckbox.addEventListener("change", updateBooruOptionVisibility);
+booruSearchSplitCheckbox.addEventListener("change", updateBooruOptionVisibility);
+booruSearchPatternUseTitleCheckbox.addEventListener("change", updateBooruOptionVisibility);
+booruSearchPageCheckbox.addEventListener("change", updateBooruOptionVisibility);
+booruSearchPatternCopyCheckbox.addEventListener("change", updateBooruOptionVisibility);
 
 // Tab Count
 function requestTabCountUpdate(booruConfig) {
-  let targetTabWindowOption = isNaN(parseInt(targetWindowTabsSelect.value)) ? targetWindowTabsSelect.value : parseInt(targetWindowTabsSelect.value);
-  let outputWindowOption = isNaN(parseInt(outputWindowSelect.value)) ? outputWindowSelect.value : parseInt(outputWindowSelect.value);
+  if (isDataLoaded) {
+    let targetTabWindowOption = isNaN(parseInt(targetWindowTabsSelect.value)) ? targetWindowTabsSelect.value : parseInt(targetWindowTabsSelect.value);
+    let outputWindowOption = isNaN(parseInt(outputWindowSelect.value)) ? outputWindowSelect.value : parseInt(outputWindowSelect.value);
 
-  chrome.runtime.sendMessage({
-    type: "REQUEST_TAB_COUNT",
-    payload: {
-      ...getCurrentConfigurations(),
-      booruConfig: booruConfig
-    }
-  })
+    chrome.runtime.sendMessage({
+      type: "REQUEST_TAB_COUNT",
+      payload: {
+        ...getCurrentConfigurations(),
+        booruConfig: booruConfig
+      }
+    })
+  }
 }
 
 async function requestTabCountUpdateAsync() {
-  let booruConfig = await getBooruData(booruSelect.value);
-  return requestTabCountUpdate(booruConfig);
+  if (isDataLoaded) {
+    let booruConfig = await getBooruData(booruSelect.value);
+    return requestTabCountUpdate(booruConfig);
+  }
 }
 
 function updateTabCount(num) {
@@ -617,12 +679,13 @@ function updateTabCount(num) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type == "TAB_COUNT") {
     updateTabCount(request.payload.tabCount);
+  } else if (request.type == "TAB_HIGHLIGHT" && targetTabsSelect.value == "highlighted") {
+    requestTabCountUpdateAsync();
   }
 });
 
 targetTabsSelect.addEventListener("change", requestTabCountUpdateAsync);
 targetWindowTabsSelect.addEventListener("change", requestTabCountUpdateAsync);
-// TODO: have tab count update when targetTabsSelect.value == "highlighted" and tab highlights have changed (im too lazy rn)
 
 // Tool dropdown
 toolDropdownBtn.addEventListener("click", () => {
@@ -692,7 +755,10 @@ function getRenamerConfigurations() {
     filterColor: renamerFilterColorSelect.value,
     pattern: renamerInputPatternInput.value,
     output: renamerOutputPatternInput.value,
-    window: windowValue
+    window: windowValue,
+    merge: renameAndMergeCheckbox.checked,
+    batchSize: 10, // TODO: create settings UI
+    batchDelay: 100
   }
 }
 
@@ -766,6 +832,7 @@ chrome.storage.local.get("settings", async function(result) {
 	settings.groupSelf = settings.groupSelf != undefined ? settings.groupSelf : false;
 	settings.groupWindowMovementBehavior = settings.groupWindowMovementBehavior != undefined ? settings.groupWindowMovementBehavior : false;
 	settings.singleTabGrouping = settings.singleTabGrouping != undefined ? settings.singleTabGrouping : true;
+	settings.artistBlacklist = settings.artistBlacklist != undefined ? settings.artistBlacklist : false;
 	settings.globalArtistTagBlacklist = settings.globalArtistTagBlacklist != undefined ? settings.globalArtistTagBlacklist : true;
 	settings.groupUnknownArtists = settings.groupUnknownArtists != undefined ? settings.groupUnknownArtists : true;
 	settings.artistRequest = settings.artistRequest != undefined ? settings.artistRequest : true;
@@ -777,7 +844,6 @@ chrome.storage.local.get("settings", async function(result) {
   }
 
   let booruData = booruConfigs[settings.booru] || defaultBooruConfigs[settings.booru];
-  updateBooruSpecificMainSettingsVisibility(booruData.simpleRegexEnabled);
 
   // Set UI settings
   booruSelect.value = settings.booru;
@@ -787,11 +853,14 @@ chrome.storage.local.get("settings", async function(result) {
   groupSelfCheckbox.checked = settings.groupSelf;
   groupWindowMovementBehaviorCheckbox.checked = settings.groupWindowMovementBehavior;
   singleTabGroupsCheckbox.checked = settings.singleTabGrouping;
+  artistBlacklistCheckbox.checked = settings.artistBlacklist;
   globalArtistTagBlacklistCheckbox.checked = settings.globalArtistTagBlacklist;
   groupUnknownArtistsCheckbox.checked = settings.groupUnknownArtists;
   artistRequestCheckbox.checked = settings.artistRequest;
 
   previousBooru = settings.booru;
+  isDataLoaded = true;
+
   updateWarnings();
   updateSubSettingVisibility();
   requestTabCountUpdate(booruData);
@@ -806,6 +875,7 @@ function saveSettings() {
   settings.groupSelf = groupSelfCheckbox.checked
   settings.groupWindowMovementBehavior = groupWindowMovementBehaviorCheckbox.checked
   settings.singleTabGrouping = singleTabGroupsCheckbox.checked
+  settings.artistBlacklist = artistBlacklistCheckbox.checked
   settings.globalArtistTagBlacklist = globalArtistTagBlacklistCheckbox.checked
   settings.groupUnknownArtists = groupUnknownArtistsCheckbox.checked
   settings.artistRequest = artistRequestCheckbox.checked
@@ -819,6 +889,7 @@ targetTabsSelect.addEventListener("change", saveSettings);
 groupSelfCheckbox.addEventListener("change", saveSettings);
 groupWindowMovementBehaviorCheckbox.addEventListener("change", saveSettings);
 singleTabGroupsCheckbox.addEventListener("change", saveSettings);
+artistBlacklistCheckbox.addEventListener("change", saveSettings);
 globalArtistTagBlacklistCheckbox.addEventListener("change", saveSettings);
 groupUnknownArtistsCheckbox.addEventListener("change", saveSettings);
 artistRequestCheckbox.addEventListener("change", saveSettings);
