@@ -9,7 +9,7 @@
   <div class="app">
     <div id="toolDropdown" class="dropdown">
       <button id="toolDropdownBtn" class="dropdownBtn generalButton">
-        <svg id="toolDropdownBtnImg" width="800px" height="800px" viewBox="0 -0.5 17 17" xmlns="http://www.w3.org/2000/svg">
+        <svg width="800px" height="800px" viewBox="0 -0.5 17 17" xmlns="http://www.w3.org/2000/svg">
           <g fill-rule="evenodd">
               <path d="M11.988,8.031 L11.988,7 L4.031,7 L4.031,8.031 L1.938,8.031 L1.938,7 L0.0139770486,7 L0.0139770486,13 L16,13 L16,7 L14.031,7 L14.031,8.031 L11.988,8.031 Z"></path>
               <path d="M4,4.9855957 L4,5.96789551 L12,5.96789551 L12,4.9855957 L14,4.9855957 L14,5.96789551 L15.9873047,5.96789551 L15.9873045,3 L0,3 L2.21252548e-07,5.96789551 L1.97381592,5.96789551 L1.97381606,4.9855957 L4,4.9855957 Z"></path>
@@ -20,7 +20,7 @@
       <div class="dropdownContent" id="toolDropdownContent">
           <button class="dropdownOption" value="mainTool" disabled>Main</button>
           <button class="dropdownOption" value="renamerTool">Renamer</button>
-          <button class="dropdownOption" value="groupSortTool">Group Sort (soon)</button>
+          <button class="dropdownOption" value="groupSortTool">Group Sort</button>
       </div>
     </div>
     <div id="mainTool" class="toolWindow">
@@ -76,7 +76,7 @@
             <input type="checkbox" id="highlightGroupingBehavior"/>
             <label for="highlightGroupingBehavior">Group amongst selves</label>
           </div>
-          <div id="targetWindowTabsSettingItem" class="setting-item sub-item dropdown hidden">
+          <div id="targetWindowTabsSettingItem" class="setting-item sub-item dropdown hidden windowDropdown">
             <label for="targetWindowTabs">Window</label>
             <select id="targetWindowTabs">
             </select>
@@ -84,7 +84,7 @@
 
           <div class="setting-item top-item">
             <label for="outputWindow">Output window</label>
-            <select id="outputWindow">
+            <select id="outputWindow" class="windowDropdown">
               <option value="tabWindow">Tab's window</option>
             </select>
           </div>
@@ -270,7 +270,7 @@
 
       <div class="setting-item top-item full">
         <label for="renamerWindow">Window</label>
-        <select id="renamerWindow">
+        <select id="renamerWindow" class="windowDropdown">
           <option value="all">All</option>
           <option value="current">Current</option>
         </select>
@@ -293,7 +293,84 @@
       </div>
     </div>
     <div id="groupSortTool" class="toolWindow defaultHidden fullPage">
+      <div class="checkbox-label-input-setting-item3">
+        <input type="checkbox" id="sorterPatternCheckbox"/>
+        <label for="sorterPatternCheckbox">Group pattern</label>
+        <input type="text" id="sorterPattern" placeholder=".+ | Gelbooru Group">
+      </div>
+      
+      <div class="checkbox-label-input-setting-item3">
+        <input type="checkbox" id="sorterSizeSortCheckbox"/>
+        <label for="sorterSizeSortCheckbox">Sort by size</label>
+        <select id="sorterSizeSortMethod">
+          <option value="descending">Descending</option>
+          <option value="ascending">Ascending</option>
+        </select>
+      </div>
+      
+      <div class="checkbox-label-input-setting-item3">
+        <input type="checkbox" id="sorterCategorizeCheckbox"/>
+        <label for="sorterCategorizeCheckbox">Categorize</label>
+        <select id="sorterCategorizeMethod">
+          <option value="safeFirst">Safe first</option>
+          <option value="unsafeFirst">Unsafe first</option>
+        </select>
+      </div>
 
+      <div class="setting-item sub-item2 dropdown full hidden">
+        <label for="sorterSafeColor">Safe Color</label>
+        <select id="sorterSafeColor">
+          <option value="any">Any</option>
+          <option value="blue">Blue</option>
+          <option value="red">Red</option>
+          <option value="grey">Grey</option>
+          <option value="yellow">Yellow</option>
+          <option value="green">Green</option>
+          <option value="pink">Pink</option>
+          <option value="purple">Purple</option>
+          <option value="cyan">Cyan</option>
+          <option value="orange">Orange</option>
+        </select>
+      </div>
+      
+      <div class="setting-item sub-item2 dropdown full hidden">
+        <label for="sorterUnsafeColor">Unsafe Color</label>
+        <select id="sorterUnsafeColor">
+          <option value="red">Red</option>
+          <option value="blue">Blue</option>
+          <option value="grey">Grey</option>
+          <option value="yellow">Yellow</option>
+          <option value="green">Green</option>
+          <option value="pink">Pink</option>
+          <option value="purple">Purple</option>
+          <option value="cyan">Cyan</option>
+          <option value="orange">Orange</option>
+        </select>
+      </div>
+
+      <div class="setting-item top-item2 full">
+        <label for="sorterTargetWindow">Target Window</label>
+        <select id="sorterTargetWindow" class="windowDropdown">
+          <option value="all">All</option>
+          <option value="current">Current</option>
+        </select>
+      </div>
+
+      <div class="setting-item top-item2 full">
+        <label for="sorterOutputWindow">Output Window</label>
+        <select id="sorterOutputWindow" class="windowDropdown">
+          <option value="unchanged">Unchanged</option>
+        </select>
+      </div>
+
+      <p id="sorterGroupCount" class="groupCount">Matched Groups: ?</p>
+
+      <button disabled id="sorterStartBtn" class="fullBtn">Run</button>
+    
+      <div class="statusArea">
+        <p id="sorterStatusHeader" class="statusHeader"></p>
+        <progress id="sorterStatusBar" class="statusBar" value="32" max="100"></progress>
+      </div>
     </div>
   </div>
 

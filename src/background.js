@@ -2,6 +2,7 @@
 
 let isRunning = false;
 let isRenaming = false;
+let isSorting = false;
 
 // ============ HELPER FUNCTIONS ============ //
 
@@ -539,9 +540,176 @@ async function renamer(config, run = true) {
     return summary;
   }
 }
+
+// ========== GROUP SORT FUNCTIONS ========== //
+async function groupSort(config, run = true) {
+  let wasSorting = isSorting;
+  if (run) { isSorting = true }
+
+  // Validate configs
+  if (!config.categorize && !config.sizeSort) {
+    if (run) {
+      chrome.runtime.sendMessage({
+        type: "GROUP_SORT_STATUS_FINISHED",
+        payload: {text: "Must categorize or sort by size!"}
+      });
+      isSorting = false;
+      return;
+    } else {
+      return -1;
+    }
+  }
+
+  // Fetch possible groups
+  let queryOptions = {};
+
+  if (config.targetWindow == "current") {
+    queryOptions.windowId = chrome.windows.WINDOW_ID_CURRENT;
+  } else if (config.targetWindow != "all") {
+    queryOptions.windowId = config.targetWindow;
+  }
+
+  let tabGroups = await chrome.tabGroups.query(queryOptions);
+  
+  // Validate pattern input
+  let regex;
+  if (config.patternEnabled) {
+    try {
+      regex = new RegExp(config.pattern);
+
+      if (!run && !wasSorting) {
+        chrome.runtime.sendMessage({
+          type: "GROUP_SORT_STATUS_FINISHED",
+          payload: {text: ""}
+        });
+      }
+    } catch {
+      chrome.runtime.sendMessage({
+        type: "GROUP_SORT_STATUS_FINISHED",
+        payload: {text: "Invalid pattern"}
+      });
+
+      if (run) {
+        isSorting = false;
+        return;
+      } else {
+        return -1;
+      }
+    }
+  }
+
+  // Filter groups
+  let sortingInfo = {safe: [], unsafe: []};
+
+  for (let tabGroup of tabGroups) {
+    let category = "safe";
+    
+    if (config.patternEnabled && !regex.test(tabGroup.title)) {
+      continue;
+    }
+
+    if (config.categorize) {
+      let isSafe = config.safeColor == "any" || tabGroup.color == config.safeColor;
+      let isUnsafe = tabGroup.color == config.unsafeColor;
+  
+      if (isUnsafe) {
+        category = "unsafe";
+      } else if (!isSafe) {
+        continue;
+      }
+    }
+
+    let tabCount = 0;
+    if (run) {
+      let tabs = await chrome.tabs.query({groupId: tabGroup.id});
+      tabCount = tabs.length;
+    }
+
+    sortingInfo[category].push({id: tabGroup.id, tabCount: tabCount});
+  }
+
+  // Return group count if not actually running
+  if (!run) {
+    return sortingInfo.safe.length + sortingInfo.unsafe.length;
+  }
+
+  // Sort group info
+  if (config.sizeSort) {
+    let ascending = config.sizeSortMethod == "ascending";
+    sortingInfo.safe.sort((a, b) => ascending ? a.tabCount - b.tabCount : b.tabCount - a.tabCount);
+    sortingInfo.unsafe.sort((a, b) => ascending ? a.tabCount - b.tabCount : b.tabCount - a.tabCount);
+  }
+
+  // Concatenate group info
+  let groups;
+
+  if (config.categorize) {
+    if (config.categorizeMethod == "unsafeFirst") {
+      groups = sortingInfo.unsafe.concat(sortingInfo.safe);
+    } else {
+      groups = sortingInfo.safe.concat(sortingInfo.unsafe);
+    }
+  } else {
+    groups = sortingInfo.safe;
+  }
+
+  // Sort groups
+  let completed = 0;
+  let promises = [];
+
+  async function updateProgress() {
+    completed++;
+    chrome.runtime.sendMessage({
+      type: "GROUP_SORT_STATUS_UPDATE",
+      payload: {
+        header: "Renaming groups...",
+        progress: completed,
+        total: groups.length
+      }
+    });
+  }
+
+  async function pushPromise(promise) {
+    promises.push(promise.finally(updateProgress));
+
+    if (promises.length >= config.batchSize) {
+      await Promise.all(promises); // wait for current batch to finish
+      await new Promise(resolve => setTimeout(resolve, config.batchDelay)); // wait a delay amount
+      promises.length = 0; // clear & reset batch
+    }
+  }
+
+  let moveOptions = {index: -1}
+
+  if (config.outputWindow != "unchanged") {
+    moveOptions.windowId = config.outputWindow;
+  }
+
+  for (let group of groups) {
+    pushPromise(chrome.tabGroups.move(group.id, moveOptions).catch(() => {
+      if (chrome.runtime.lastError) {
+        console.log(`Error moving tab group ${group.id}: ${chrome.runtime.lastError.message}`);
+      }
+    }));
+  }
+
+  await Promise.all(promises);
+
+  // Finish
+  chrome.runtime.sendMessage({
+    type: "GROUP_SORT_STATUS_FINISHED",
+    payload: {
+      text: "Finished"
+    }
+  });
+
+  isSorting = false;
+}
+
 // ================= EVENTS ================= //
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // MAIN
   if (request.type == "GROUP_TABS") {
     groupTabs(request.payload);
   } 
@@ -561,13 +729,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse(isRunning);
   } 
   
+  // RENAMER
   else if (request.type == "REQUEST_RENAMER_PREVIEW") {
     renamer(request.payload, false).then(response => {
       chrome.runtime.sendMessage({
         type: "RENAMER_PREVIEW",
         payload: response
       });
-    })
+    });
   }
 
   else if (request.type == "RENAMER_START") {
@@ -576,6 +745,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   else if (request.type == "RENAMING_CHECK") {
     sendResponse(isRenaming);
+  }
+
+  // GROUP SORTER
+  else if (request.type == "REQUEST_GROUP_SORTER_COUNT") {
+    groupSort(request.payload, false).then(response => {
+      chrome.runtime.sendMessage({
+        type: "GROUP_SORTER_COUNT",
+        payload: response
+      });
+    })
+  }
+
+  else if (request.type == "GROUP_SORT_START") {
+    groupSort(request.payload, true);
+  }
+
+  else if (request.type == "GROUP_SORT_CHECK") {
+    sendResponse(isSorting);
   }
 });
 
@@ -595,9 +782,7 @@ function updateWindowDropdowns() {
 
 chrome.windows.onCreated.addListener(updateWindowDropdowns);
 chrome.windows.onRemoved.addListener(updateWindowDropdowns);
-chrome.tabs.onActivated.addListener(evt => {
-  updateWindowDropdowns();
-});
+chrome.tabs.onActivated.addListener(updateWindowDropdowns);
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tab.active && (changeInfo.url || changeInfo.title)) {
     updateWindowDropdowns();
@@ -609,5 +794,9 @@ chrome.tabs.onHighlighted.addListener((highlightInfo) => {
   chrome.runtime.sendMessage({
     type: "TAB_HIGHLIGHT",
     payload: {}
+  }, () => {
+    if (chrome.runtime.lastError) {
+      // Popup not available, message ignored.
+    }
   });
 });

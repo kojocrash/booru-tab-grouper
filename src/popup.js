@@ -9,8 +9,10 @@ const CURRENT_BOORU_CONFIG_VERSION = 2
 let isRunning = false;
 let isEditing = false;
 let isRenaming = false;
+let isSorting = false;
 let isDataLoaded = false;
 let renamerMatchedGroupCount = 0;
+let sorterMatchedGroupCount = 0;
 
 // Data
 // TODO: load from json?
@@ -84,8 +86,6 @@ function getCurrentConfigurations() {
 async function startGroupingSignal() {
   let confirmation = window.confirm("Run Booru Tab Grouper?")
   if (confirmation) {
-    let targetTabWindowOption = isNaN(parseInt(targetWindowTabsSelect.value)) ? targetWindowTabsSelect.value : parseInt(targetWindowTabsSelect.value);
-    let outputWindowOption = isNaN(parseInt(outputWindowSelect.value)) ? outputWindowSelect.value : parseInt(outputWindowSelect.value);
     let booruConfig = await getBooruData(booruSelect.value)
 
     if (booruConfig) {
@@ -134,8 +134,9 @@ function updateRunningStatus(currentlyRunning) {
     isRunning = currentlyRunning;
   }
   
-  groupBtn.disabled = isRunning || isEditing || isRenaming;
-  renamerStartBtn.disabled = isRunning || isRenaming || renamerMatchedGroupCount <= 0 || (!renamerInputPatternInput.value && !renamerOutputPatternInput.value);
+  groupBtn.disabled = isRunning || isEditing || isRenaming || isSorting;
+  renamerStartBtn.disabled = isRunning || isRenaming || isSorting || renamerMatchedGroupCount <= 0 || (!renamerInputPatternInput.value && !renamerOutputPatternInput.value);
+  sorterStartBtn.disabled = isRunning || isRenaming || isSorting || sorterMatchedGroupCount <= 0 || (!sorterSizeSortCheckbox.checked && !sorterCategorizeCheckbox.checked);
 }
 
 chrome.runtime.sendMessage({type: "RUNNING_CHECK", payload: {}}, updateRunningStatus);
@@ -152,6 +153,12 @@ const renamerMethodSelect = document.getElementById("renamerMethod");
 const renamerWindowSelect = document.getElementById("renamerWindow");
 const renamerFilterSelect = document.getElementById("renamerFilter");
 const renamerFilterColorSelect = document.getElementById("renamerFilterColor");
+const sorterSizeSortMethodSelect = document.getElementById("sorterSizeSortMethod");
+const sorterCategorizeMethodSelect = document.getElementById("sorterCategorizeMethod");
+const sorterSafeColorSelect = document.getElementById("sorterSafeColor");
+const sorterUnsafeColorSelect = document.getElementById("sorterUnsafeColor");
+const sorterTargetWindowSelect = document.getElementById("sorterTargetWindow");
+const sorterOutputWindowSelect = document.getElementById("sorterOutputWindow");
 
 // Text field
 const groupNameSuffixInput = document.getElementById("groupNameSuffix");
@@ -163,6 +170,7 @@ const booruSearchSplitPatternInput = document.getElementById("booruSearchSplitPa
 const unsafeTagListInput = document.getElementById("unsafeTagList");
 const renamerInputPatternInput = document.getElementById("renamerInputPattern");
 const renamerOutputPatternInput = document.getElementById("renamerOutputPattern");
+const sorterPatternInput = document.getElementById("sorterPattern");
 
 // Number inputs
 const booruImageSplitMainMatchIndexInput = document.getElementById("booruImageSplitMainMatchIndex");
@@ -170,7 +178,6 @@ const booruSearchSplitMainMatchIndexInput = document.getElementById("booruSearch
 
 // Checkboxes
 const groupSelfCheckbox = document.getElementById("highlightGroupingBehavior");
-const moveGroupsCheckbox = document.getElementById("moveGroupsToWindow");
 const groupWindowMovementBehaviorCheckbox = document.getElementById("groupWindowMovementBehavior");
 const singleTabGroupsCheckbox = document.getElementById("singleTabGroups");
 const artistBlacklistCheckbox = document.getElementById("artistBlacklistCheckbox");
@@ -187,6 +194,9 @@ const booruSearchSplitCheckbox = document.getElementById("booruSearchSplitCheckb
 const booruSearchPatternUseTitleCheckbox = document.getElementById("booruSearchPatternUseTitleCheckbox");
 const booruSearchPatternUrlDecodeCheckbox = document.getElementById("booruSearchPatternUrlDecodeCheckbox");
 const renameAndMergeCheckbox = document.getElementById("renameAndMergeCheckbox");
+const sorterPatternCheckbox = document.getElementById("sorterPatternCheckbox");
+const sorterSizeSortCheckbox = document.getElementById("sorterSizeSortCheckbox");
+const sorterCategorizeCheckbox = document.getElementById("sorterCategorizeCheckbox");
 
 // Labels
 const previewText = document.getElementById("previewText");
@@ -195,9 +205,12 @@ const tabCountLabel = document.getElementById("tabCountLabel");
 const renamerPreviewText = document.getElementById("renamerPreview");
 const renamerGroupCountLabel = document.getElementById("renamerGroupCount");
 const renamerStatusHeader = document.getElementById("renamerStatusHeader");
+const sorterGroupCountLabel = document.getElementById("sorterGroupCount");
+const sorterStatusHeader = document.getElementById("sorterStatusHeader");
 
 // Progress Bars
 const renamerStatusBar = document.getElementById("renamerStatusBar");
+const sorterStatusBar = document.getElementById("sorterStatusBar");
 
 // Warning section
 const warningText = document.getElementById("warningText");
@@ -224,10 +237,10 @@ const booruEditCancelBtn = document.getElementById("booruEditCancelBtn");
 const booruEditBtn = document.getElementById("booruEditBtn");
 const toolDropdownBtn = document.getElementById("toolDropdownBtn");
 const renamerStartBtn = document.getElementById("renamerStartBtn");
+const sorterStartBtn = document.getElementById("sorterStartBtn");
 
 // Misc
 const newBooruOption = document.getElementById("newBooruOption");
-const toolDropdownBtnImg = document.getElementById("toolDropdownBtnImg");
 
 // ========= UI FUNCTIONALITY ========= //
 // Show/hide relevant UI
@@ -281,7 +294,7 @@ outputWindowSelect.addEventListener("change", updateWarnings);
 targetWindowTabsSelect.addEventListener("change", updateWarnings);
 
 // Populate Window Dropdowns
-const windowDropdowns = [outputWindowSelect, targetWindowTabsSelect, renamerWindowSelect];
+const windowDropdowns = document.getElementsByClassName("windowDropdown");
 
 function populateWindowDropdowns() {
   chrome.windows.getAll({
@@ -652,9 +665,6 @@ booruSearchPatternCopyCheckbox.addEventListener("change", updateBooruOptionVisib
 // Tab Count
 function requestTabCountUpdate(booruConfig) {
   if (isDataLoaded) {
-    let targetTabWindowOption = isNaN(parseInt(targetWindowTabsSelect.value)) ? targetWindowTabsSelect.value : parseInt(targetWindowTabsSelect.value);
-    let outputWindowOption = isNaN(parseInt(outputWindowSelect.value)) ? outputWindowSelect.value : parseInt(outputWindowSelect.value);
-
     chrome.runtime.sendMessage({
       type: "REQUEST_TAB_COUNT",
       payload: {
@@ -822,6 +832,125 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     requestRenamerPreviewUpdate();
   }
 });
+
+// Group sorter
+function getSorterConfigurations() {
+  let sorterTargetWindowValue = isNaN(parseInt(sorterTargetWindowSelect.value)) ? sorterTargetWindowSelect.value : parseInt(sorterTargetWindowSelect.value);
+  let sorterOutputWindowValue = isNaN(parseInt(sorterOutputWindowSelect.value)) ? sorterOutputWindowSelect.value : parseInt(sorterOutputWindowSelect.value);
+
+  return {
+    patternEnabled: sorterPatternCheckbox.checked,
+    pattern: sorterPatternInput.value,
+    sizeSort: sorterSizeSortCheckbox.checked,
+    sizeSortMethod: sorterSizeSortMethodSelect.value,
+    categorize: sorterCategorizeCheckbox.checked,
+    categorizeMethod: sorterCategorizeMethodSelect.value,
+    safeColor: sorterSafeColorSelect.value,
+    unsafeColor: sorterUnsafeColorSelect.value,
+    targetWindow: sorterTargetWindowValue,
+    outputWindow: sorterOutputWindowValue,
+    batchSize: 15, // TODO: create settings UI
+    batchDelay: 100
+  }
+}
+
+function startGroupSorter() {
+  updateSorterState(true);
+
+  chrome.runtime.sendMessage({
+    type: "GROUP_SORT_START",
+    payload: getSorterConfigurations()
+  });
+}
+
+sorterStartBtn.addEventListener("click", startGroupSorter);
+
+// Init state check
+function updateSorterState(currentlySorting) {
+  if (currentlySorting != undefined) {
+    isSorting = currentlySorting;
+  }
+
+  updateRunningStatus();
+}
+
+chrome.runtime.sendMessage({type: "GROUP_SORT_CHECK", payload: {}}, updateSorterState);
+
+// Group sort status updates
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type == "GROUP_SORT_STATUS_UPDATE") {
+    sorterStatusHeader.innerText = request.payload.header;
+    sorterStatusHeader.style.visibility = "visible";
+    sorterStatusBar.max = request.payload.total;
+    sorterStatusBar.value = request.payload.progress;
+    sorterStatusBar.style.visibility = "visible";
+  } else if (request.type == "GROUP_SORT_STATUS_FINISHED") {
+    sorterStatusHeader.style.visibility = "visible";
+    sorterStatusBar.style.visibility = "hidden";
+    sorterStatusHeader.innerText = request.payload.text;
+    updateSorterState(false);
+    requestSorterCountUpdate();
+  }
+});
+
+// Group count
+function updateGroupSorterCount(count) {
+  sorterGroupCountLabel.innerText = `Matched Groups: ${count < 0 ? "?" : count}`;
+  sorterMatchedGroupCount = count;
+  updateSorterState();
+}
+
+function requestSorterCountUpdate() {
+  chrome.runtime.sendMessage({
+    type: "REQUEST_GROUP_SORTER_COUNT",
+    payload: getSorterConfigurations()
+  });
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type == "GROUP_SORTER_COUNT") {
+    updateGroupSorterCount(request.payload);
+  }
+});
+
+sorterPatternInput.addEventListener("input", requestSorterCountUpdate);
+sorterPatternCheckbox.addEventListener("change", requestSorterCountUpdate);
+sorterSizeSortCheckbox.addEventListener("change", requestSorterCountUpdate);
+sorterCategorizeCheckbox.addEventListener("change", requestSorterCountUpdate);
+sorterSafeColorSelect.addEventListener("change", requestSorterCountUpdate);
+sorterUnsafeColorSelect.addEventListener("change", requestSorterCountUpdate);
+sorterTargetWindowSelect.addEventListener("change", requestSorterCountUpdate);
+
+// Group sorter UI visibility
+function updateSorterView() {
+  sorterPatternInput.disabled = !sorterPatternCheckbox.checked;
+  sorterSizeSortMethodSelect.disabled = !sorterSizeSortCheckbox.checked;
+  sorterCategorizeMethodSelect.disabled = !sorterCategorizeCheckbox.checked;
+  sorterSafeColorSelect.parentNode.style.display = sorterCategorizeCheckbox.checked ? "flex" : "none";
+  sorterUnsafeColorSelect.parentNode.style.display = sorterCategorizeCheckbox.checked ? "flex" : "none";
+}
+
+sorterPatternCheckbox.addEventListener("change", updateSorterView);
+sorterSizeSortCheckbox.addEventListener("change", updateSorterView);
+sorterCategorizeCheckbox.addEventListener("change", updateSorterView);
+updateSorterView();
+
+function sorterSafeColorChanged() {
+  for (let colorOption of sorterUnsafeColorSelect.querySelectorAll("option")) {
+    colorOption.disabled = colorOption.value == sorterSafeColorSelect.value;
+  }
+}
+
+function sorterUnsafeColorChanged() {
+  for (let colorOption of sorterSafeColorSelect.querySelectorAll("option")) {
+    colorOption.disabled = colorOption.value == sorterUnsafeColorSelect.value;
+  }
+}
+
+sorterSafeColorSelect.addEventListener("change", sorterSafeColorChanged);
+sorterUnsafeColorSelect.addEventListener("change", sorterUnsafeColorChanged);
+sorterSafeColorChanged();
+sorterUnsafeColorChanged();
 
 // Load settings
 chrome.storage.local.get("settings", async function(result) {
